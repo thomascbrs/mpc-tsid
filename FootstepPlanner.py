@@ -42,8 +42,15 @@ class FootstepPlanner:
         self.footsteps_prediction = np.zeros((3, 4))
 
         # To store the result of the update_footsteps_tsid function
-        self.footsteps_tsid = np.zeros((3, 4))
-        self.t_remaining_tsid = np.zeros((1, 4))
+        self.footsteps_tsid = np.zeros((3, 4), dtype=np.float64)
+        self.t_remaining_tsid = np.zeros((1, 4), dtype=np.float64)
+
+    """
+    cpdef int scan_column(self, CS.ContactSequencer sequencer, int i)
+    def scan_column(self, sequencer, i):
+        print(sequencer)
+        print(i)
+        return [idx for idx, val in np.ndenumerate(sequencer.S[:, i]) if val==1.0]"""
 
     def update_footsteps_tsid(self, sequencer, vel_ref, v_xy, t_stance, T, h):
         """Returns a 2 by 4 matrix containing the [x, y]^T position of the next desired footholds for the four feet
@@ -66,14 +73,20 @@ class FootstepPlanner:
         # p[1, :] += np.array([0.025, -0.025, 0.025, -0.025])
 
         # Add symmetry term
-        self.footsteps_tsid[0:2, :] = t_stance * 0.5 * np.tile(v_xy, 4)
+        deb = 1
+        print(np.tile(v_xy, 4))
+        print(np.float(t_stance * 0.5))
+        print(np.tile(np.float(t_stance * 0.5) * v_xy, 4))
+        print(self.footsteps_tsid[0:2, 0:])
+        self.footsteps_tsid[0:2, :] = self.footsteps_tsid[1:3, :]
+        # self.footsteps_tsid[0:2, :] = np.tile(t_stance * 0.5 * v_xy, 4).ravel()
 
         # Add feedback term
-        self.footsteps_tsid[0:2, :] += self.k_feedback * (v_xy - vel_ref[0:2, 0:1])
+        self.footsteps_tsid[0:2, :] = self.footsteps_tsid[0:2, :] + self.k_feedback * (v_xy - vel_ref[0:2, 0:1])
 
         # Add centrifugal term
         # cross = np.cross(vel_cur[0:3, 0:1], vel_ref[3:6, 0:1], 0, 0).T
-        self.footsteps_tsid[0:2, :] += 0.5 * np.sqrt(h/self.g) * np.array([[v_xy[1, 0] * vel_ref[5, 0]],
+        self.footsteps_tsid[0:2, :] = self.footsteps_tsid[0:2, :] + 0.5 * np.sqrt(h/self.g) * np.array([[v_xy[1, 0] * vel_ref[5, 0]],
                                                                            [- v_xy[0, 0] * vel_ref[5, 0]]])
 
         # Time remaining before the end of the currrent swing phase
@@ -85,18 +98,19 @@ class FootstepPlanner:
             if (sequencer.S[0, i] == 1.0) and (sequencer.S[-1, i] == 0.0):
                 self.t_remaining_tsid[0, i] = sequencer.T_gait
             else:
-                index = next((idx for idx, val in np.ndenumerate(sequencer.S[:, i]) if val==1.0), 0.0)[0]
+                """index = next(self.scan_column(sequencer, i), 0.0)[0]"""
+                index = next(iter([idx for idx, val in np.ndenumerate(sequencer.S[:, i]) if val==1]), 0)
                 self.t_remaining_tsid[0, i] = index * self.dt
 
         # Add velocity forecast
         if vel_ref[5, 0] != 0:
-            self.footsteps_tsid[0, :] += (v_xy[0, 0] * np.sin(vel_ref[5, 0] * self.t_remaining_tsid[0, :]) +
-                                          v_xy[1, 0] * (np.cos(vel_ref[5, 0] * self.t_remaining_tsid[0, :]) - 1)) / vel_ref[5, 0]
-            self.footsteps_tsid[1, :] += (v_xy[1, 0] * np.sin(vel_ref[5, 0] * self.t_remaining_tsid[0, :]) -
-                                          v_xy[0, 0] * (np.cos(vel_ref[5, 0] * self.t_remaining_tsid[0, :]) - 1)) / vel_ref[5, 0]
+            self.footsteps_tsid[0, :] = self.footsteps_tsid[0, :] + (v_xy[0, 0] * np.sin(np.float(vel_ref[5, 0]) * self.t_remaining_tsid[0, :]) +
+                                          v_xy[1, 0] * (np.cos(np.float(vel_ref[5, 0]) * self.t_remaining_tsid[0, :]) - 1)) / vel_ref[5, 0]
+            self.footsteps_tsid[1, :] = self.footsteps_tsid[1, :] + (v_xy[1, 0] * np.sin(np.float(vel_ref[5, 0]) * self.t_remaining_tsid[0, :]) -
+                                          v_xy[0, 0] * (np.cos(np.float(vel_ref[5, 0]) * self.t_remaining_tsid[0, :]) - 1)) / vel_ref[5, 0]
         else:
-            self.footsteps_tsid[0, :] += v_xy[0, 0] * self.t_remaining_tsid[0, :]
-            self.footsteps_tsid[1, :] += v_xy[1, 0] * self.t_remaining_tsid[0, :]
+            self.footsteps_tsid[0, :] = self.footsteps_tsid[0, :] + np.float(v_xy[0, 0]) * self.t_remaining_tsid[0, :]
+            self.footsteps_tsid[1, :] = self.footsteps_tsid[1, :] + np.float(v_xy[1, 0]) * self.t_remaining_tsid[0, :]
 
         # Legs have a limited length so the deviation has to be limited
         self.footsteps_tsid[0:2, :] = np.clip(self.footsteps_tsid[0:2, :], -self.L, self.L)
@@ -138,7 +152,7 @@ class FootstepPlanner:
         p += 0.5 * np.sqrt(mpc.q[2, 0]/self.g) * cross[0:2, 0:1]
 
         # Time remaining before the end of the currrent swing phase
-        t_remaining = np.zeros((1, 4))
+        """t_remaining = np.zeros((1, 4))
         for i in range(4):
             indexes_stance = (np.where(sequencer.S[:, i] == True))[0]
             indexes_swing = (np.where(sequencer.S[:, i] == False))[0]
@@ -147,7 +161,19 @@ class FootstepPlanner:
                 t_remaining[0, i] = sequencer.T_gait
             else:
                 index = (indexes_stance[indexes_stance > indexes_swing[0]])[0]
+                t_remaining[0, i] = index * self.dt"""
+        t_remaining = np.zeros((1, 4))
+        for i in range(4):
+            # indexes_stance = (np.where(sequencer.S[:, i] == True))[0]
+            # indexes_swing = (np.where(sequencer.S[:, i] == False))[0]
+            # index = (np.where(S[:, i] == True))[0][0]
+            if (sequencer.S[0, i] == 1.0) and (sequencer.S[-1, i] == 0.0):
+                t_remaining[0, i] = sequencer.T_gait
+            else:
+                """index = next(self.scan_column(sequencer, i), 0.0)[0]"""
+                index = next(iter([idx for idx, val in np.ndenumerate(sequencer.S[:, i]) if val==1]), 0)
                 t_remaining[0, i] = index * self.dt
+
 
         # Add velocity forecast
         if mpc.v_ref[5, 0] != 0:
@@ -171,7 +197,7 @@ class FootstepPlanner:
             self.footsteps[:, i] = p[:, i]
 
         # Updating quantities expressed in world frame
-        self.update_world_frame(mpc.q_w)
+        # self.update_world_frame(mpc.q_w)
 
         return 0
 

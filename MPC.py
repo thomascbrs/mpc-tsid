@@ -370,7 +370,7 @@ class MPC:
             self.ML.data[self.i_update_B + i_iter] = self.B[self.i_x_B, self.i_y_B]
 
         # Update state of legs
-        self.ML.data[self.i_update_S] = (1 - np.repeat(sequencer.S.reshape((-1,)), 3)).ravel()
+        self.ML.data[self.i_update_S] = (1 - np.repeat(np.reshape(sequencer.S, (-1,)), 3)).ravel()
 
         return 0
 
