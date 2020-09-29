@@ -1,0 +1,3 @@
+ffmpeg -an -i test_1.avi -vcodec libx264 -pix_fmt yuv420p -profile:v baseline -level 3 walk_lin_vx028_vy028_fail.mp4
+
+

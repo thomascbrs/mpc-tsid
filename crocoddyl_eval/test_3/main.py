@@ -61,7 +61,7 @@ def run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION
                                           k_mpc, fstep_planner.T_gait, enable_multiprocessing)
 
     # MPC with augmented states
-    mpc_planner = MPC_crocoddyl_planner(dt = dt_mpc , T_mpc = fstep_planner.T_gait)
+    mpc_planner = MPC_crocoddyl_planner(dt = dt_mpc , T_mpc = fstep_planner.T_gait , n_periods = n_periods)
                                         
     # Enable/Disable hybrid control
     enable_hybrid_control = True
@@ -70,8 +70,8 @@ def run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION
     #                            Logger DDP                                #
     ########################################################################
 
-    pred_trajectories = np.zeros((20, int(T_gait/dt_mpc), int(N_SIMULATION/k_mpc)))
-    pred_forces = np.zeros((12, int(T_gait/dt_mpc), int(N_SIMULATION/k_mpc)))
+    pred_trajectories = np.zeros((20, int(T_gait/dt_mpc)*n_periods, int(N_SIMULATION/k_mpc)))
+    pred_forces = np.zeros((12, int(T_gait/dt_mpc)*n_periods, int(N_SIMULATION/k_mpc)))
     fsteps = np.zeros((20,13,int(N_SIMULATION/k_mpc)))
     gait_ = np.zeros((20,5,int(N_SIMULATION/k_mpc)))
     l_feet_ = np.zeros((3,4,int(N_SIMULATION/k_mpc)))

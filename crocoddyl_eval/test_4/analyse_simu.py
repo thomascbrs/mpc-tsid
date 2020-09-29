@@ -16,14 +16,14 @@ import matplotlib.pylab as plt
 
 folder_name = ""
 pathIn = "crocoddyl_eval/test_4/log_eval/"
-res = np.load(pathIn + folder_name + "results_wyaw_all_false.npy" , allow_pickle=True )
+res = np.load(pathIn + folder_name + "results_wyaw_ddp_heur_linearModel.npy" , allow_pickle=True )
 # res1 = np.load(pathIn + folder_name + "results_osqp_wyaw.npy" , allow_pickle=True )
 
 import numpy as np
 
-X = np.linspace(1,-1,25)
+X = np.linspace(1,-1,29)
 # Y = np.linspace(-1,1,65)
-W = np.linspace(-2.2,2.2,25)
+W = np.linspace(-2.7,2.7,29)
 
 def find_nearest(Vx , Vy):
     idx = (np.abs(X - Vx)).argmin()
@@ -34,7 +34,7 @@ def find_nearest(Vx , Vy):
 
 XX , YY = np.meshgrid(X,W)
 Z = np.zeros((XX.shape[0] , YY.shape[1]))
-Z_osqp = np.zeros((XX.shape[0] , YY.shape[1]))
+# Z_osqp = np.zeros((XX.shape[0] , YY.shape[1]))
 # plt.figure()
 
 # for elt in res : 
@@ -53,7 +53,7 @@ for elt in res :
     Z[idx,idy] = elt[0]
 
 plt.rc('text', usetex=True)
-im = plt.imshow(Z ,cmap = plt.cm.binary , extent=(-2.2,2.2,-1,1))
+im = plt.imshow(Z ,cmap = plt.cm.binary , extent=(-2.7,2.7,-1,1))
 plt.xlabel("Lateral Velocity $\dot{p_y} \hspace{2mm} [m.s^{-1}]$" , fontsize=12)
 plt.ylabel("Forward Velocity $\dot{p_x} \hspace{2mm} [m.s^{-1}]$" , fontsize=12)
 plt.title("Viable Operating Regions (DDP and foot optimization)" , fontsize=14)

@@ -62,6 +62,18 @@ class MPC_crocoddyl_planner():
         self.w_vroll =  0.05*np.sqrt(self.w_roll)
         self.w_vpitch =  0.07*np.sqrt(self.w_pitch)
         self.w_vyaw =  0.05*np.sqrt(self.w_yaw)
+        # self.w_x = np.sqrt(0.5)
+        # self.w_y = np.sqrt(0.5)
+        # self.w_z = np.sqrt(2.)
+        # self.w_roll = np.sqrt(0.11)
+        # self.w_pitch = np.sqrt(0.11)
+        # self.w_yaw = np.sqrt(0.11)
+        # self.w_vx =  np.sqrt(2.*np.sqrt(0.5))
+        # self.w_vy =  np.sqrt(2.*np.sqrt(0.5))
+        # self.w_vz =  np.sqrt(2.*np.sqrt(2.))
+        # self.w_vroll =  np.sqrt(0.05*np.sqrt(0.11))
+        # self.w_vpitch =  np.sqrt(0.05*np.sqrt(0.11))
+        # self.w_vyaw =  np.sqrt(0.05*np.sqrt(0.11))
         self.stateWeights = np.array([self.w_x, self.w_y, self.w_z, self.w_roll, self.w_pitch, self.w_yaw,
                                     self.w_vx, self.w_vy, self.w_vz, self.w_vroll, self.w_vpitch, self.w_vyaw])
 
@@ -88,7 +100,11 @@ class MPC_crocoddyl_planner():
         self.index = 0
 
         # Position of the feet in local frame
-        self.fsteps = np.full((20, 13), 0.0)        
+        self.fsteps = np.full((20, 13), 0.0)    
+
+        # Weight on the shoulder term : 
+        self.shoulderWeights = 2.
+        self.shoulder_hlim = 0.225    
 
         # List of the actionModel
         self.ListAction = [] 
@@ -98,7 +114,7 @@ class MPC_crocoddyl_planner():
         self.u_init = []       
 
         # Weights on the shoulder term : term 1
-        self.shoulderWeights = np.array(4*[0.3,0.4])
+        self.heuristicWeights = np.array(4*[0.3,0.4])
 
         # symmetry & centrifugal term in foot position heuristic
         self.centrifugal_term = True
@@ -228,7 +244,7 @@ class MPC_crocoddyl_planner():
                     self.u_init.append(np.zeros(12))
                     k_cum +=  1
                     gap -= 1
-                    # self.ListAction[i+1].shoulderWeights = 2*np.array(4*[0.25,0.3])
+                    # self.ListAction[i+1].heuristicWeights = 2*np.array(4*[0.25,0.3])
                     
                 else : 
                     self.ListAction[i].updateModel(np.reshape(self.l_fsteps, (3, 4), order='F') , xref[:, i+gap]  , self.gait[j, 1:])                    
@@ -284,17 +300,22 @@ class MPC_crocoddyl_planner():
         # Weight on feet position 
         # will be set when needed
         model.lastPositionWeights = np.full(8,0.0)
-        model.shoulderWeights = self.shoulderWeights
+        model.heuristicWeights = self.heuristicWeights
         model.symmetry_term = self.symmetry_term
         model.centrifugal_term = self.centrifugal_term
+
+        model.shoulderWeights = self.shoulderWeights
+        model.shoulder_hlim = self.shoulder_hlim      
 
         return 0
     
     def update_model_step(self , model):
         """Set intern parameters for step model type
         """
-        model.shoulderWeights =  self.shoulderWeights
+        model.heuristicWeights =  self.heuristicWeights 
         model.stateWeights =  self.stateWeights
+        # model.heuristicWeights =  np.zeros(8)
+        # model.stateWeights =  np.zeros(12)
         model.stepWeights = self.stepWeights
         model.symmetry_term = self.symmetry_term
         model.centrifugal_term = self.centrifugal_term
@@ -341,7 +362,7 @@ class MPC_crocoddyl_planner():
         # Weights vectors of terminal node
         self.terminalModel.forceWeights = np.zeros(12)
         self.terminalModel.frictionWeights = 0.
-        self.terminalModel.shoulderWeights = np.full(8,0.0)
+        # self.terminalModel.heuristicWeights = np.full(8,0.0)
         self.terminalModel.lastPositionWeights =  np.full(8,0.0)
 
         # Shooting problem

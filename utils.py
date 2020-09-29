@@ -202,7 +202,7 @@ class pybullet_simulator:
     def __init__(self, envID, dt=0.001):
 
         # Start the client for PyBullet
-        physicsClient = pyb.connect(pyb.DIRECT)
+        physicsClient = pyb.connect(pyb.GUI)
         # p.GUI for graphical version
         # p.DIRECT for non-graphical version
 
@@ -380,8 +380,8 @@ class pybullet_simulator:
         pyb.setTimeStep(dt)
 
         # Change camera position
-        pyb.resetDebugVisualizerCamera(cameraDistance=0.6, cameraYaw=-50, cameraPitch=-35,
-                                       cameraTargetPosition=[0.0, 0.6, 0.0])
+        pyb.resetDebugVisualizerCamera(cameraDistance=0.8, cameraYaw=-50, cameraPitch=-35,
+                                       cameraTargetPosition=[0.0, 0.8, 0.0])
 
     def check_pyb_env(self, k, envID, qmes12):
         """Check the state of the robot to trigger events and update camera
@@ -418,7 +418,7 @@ class pybullet_simulator:
         RPY = pin.rpy.matrixToRpy(oMb_tmp.rotation)
 
         # Update the PyBullet camera on the robot position to do as if it was attached to the robot
-        pyb.resetDebugVisualizerCamera(cameraDistance=0.6, cameraYaw=(0.0*RPY[2]*(180/3.1415)+45), cameraPitch=-39.9,
+        pyb.resetDebugVisualizerCamera(cameraDistance=0.8, cameraYaw=(0.0*RPY[2]*(180/3.1415)+50), cameraPitch=-27.9,
                                        cameraTargetPosition=[qmes12[0, 0], qmes12[1, 0] + 0.0, 0.0])
 
         return 0

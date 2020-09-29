@@ -78,8 +78,8 @@ class MPC_crocoddyl:
         self.index = 0
 
         # Weight on the shoulder term : 
-        self.shoulderWeights = 10.
-        self.shoulder_hlim = 0.22
+        self.shoulderWeights = 2.
+        self.shoulder_hlim = 0.225
 
         # Position of the feet
         self.fsteps = np.full((20, 13), np.nan)

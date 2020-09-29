@@ -26,7 +26,8 @@ N_SIMULATION = 5000  # number of simulated TSID time steps
 
 # Which MPC solver you want to use
 # True to have PA's MPC, to False to have Thomas's MPC
-type_MPC = False 
+type_MPC = True 
+optim_pieds = False   # --> False : use initial heuristic
 
 # Whether PyBullet feedback is enabled or not
 pyb_feedback = True
@@ -40,18 +41,47 @@ def run_simu_wyaw(speed) :
     desired_speed[0] = speed[0]
     desired_speed[5] = speed[1]
 
-    return run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION, type_MPC, pyb_feedback , desired_speed)
+    return run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION, type_MPC, pyb_feedback , desired_speed , optim_pieds)
 
 def run_simu_vy(speed) : 
     desired_speed = np.zeros(6)
     desired_speed[0] = speed[0]
     desired_speed[1] = speed[1]
 
-    return run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION, type_MPC, pyb_feedback , desired_speed)
+    return run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION, type_MPC, pyb_feedback , desired_speed , optim_pieds)
+
+#When simulation has been stopped in the middle of optimisation 
+# It appends with osqp
+# ############
+# f = open('../test7.txt','r')
+
+# X = np.linspace(1,-1,30)
+# W = np.linspace(-2.7,2.7,30)
+# Z = np.full((30,30),False)
+
+# def find_nearest(Vx , Vy):
+#     idx = (np.abs(X - Vx)).argmin()
+#     idy = (np.abs(W - Vy)).argmin()
+
+#     return idx , idy
+
+# for line in f.readlines():
+#     list_mot = line.split(" ")
+#     if list_mot[0] == "Vx" :   
+#         idx , idy = find_nearest(float(list_mot[3]) ,float(list_mot[17]))
+#         Z[idx,idy] = True
+
+# list_param = []
+# for i in range(0,30) :
+#     for j in range(0,30) :
+#         if Z[i,j] == False : 
+#             list_param.append([X[i] , W[j]])
+# ################
+
 
 # List of arguments 
-X = np.linspace(-1,1,25)
-W = np.linspace(-2.2,2.2,25)
+X = np.linspace(-1,1,2)
+W = np.linspace(-2.2,2.2,2)
 list_param = []
 for i in range(X.size) : 
     for j in range(W.size) : 
@@ -71,7 +101,7 @@ mem_time = time.time() - start_time
 # Logger of the results
 pathIn = "crocoddyl_eval/test_4/log_eval/"
 print("Saving logs...")
-np.save(pathIn +  "results_wyaw_all_true.npy" , np.array(res) )
+np.save(pathIn +  "results_wyaw_ddp_heuristic_linear.npy" , np.array(res) )
 
 # ###########################
 # # New simulation with osqp, 
@@ -101,14 +131,13 @@ np.save(pathIn +  "results_wyaw_all_true.npy" , np.array(res) )
 ###########################
 
 # List of arguments 
-X = np.linspace(-1,1,25)
-Y = np.linspace(-1,1,25)
+X = np.linspace(-1,1,2)
+Y = np.linspace(-1,1,2)
 list_param = []
 for i in range(X.size) : 
     for j in range(Y.size) : 
         list_param.append([X[i] , Y[j]])
 
-type_MPC = False
 
 #time
 start_time = time.time()
@@ -123,6 +152,6 @@ print("Temps d execution ddp vy: %s secondes ---" % (time.time() - start_time))
 # Logger of the results
 pathIn = "crocoddyl_eval/test_4/log_eval/"
 print("Saving logs...")
-np.save(pathIn +  "results_vy_all_true.npy" , np.array(res2) )
+np.save(pathIn +  "results_vy_ddp_heuristic_linear.npy" , np.array(res2) )
 
 quit()

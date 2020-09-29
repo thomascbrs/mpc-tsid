@@ -18,7 +18,7 @@ import MPC_Wrapper
 import pybullet as pyb
 from crocoddyl_class.MPC_crocoddyl_planner import *
 
-def run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION_, type_MPC, pyb_feedback, desired_speed):
+def run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION_, type_MPC, pyb_feedback, desired_speed , optim_pieds):
 
     ########################################################################
     #                        Parameters definition                         #
@@ -45,6 +45,7 @@ def run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION
 
 
     N_SIMULATION = max(N_1 , N_2 , N_3)
+    print("Initial Vx = " , desired_speed[0] , " ; Vy = " , desired_speed[1] ,  " ; Vw = " , desired_speed[5] )
    
 
     # Initialize the error for the simulation time
@@ -157,7 +158,7 @@ def run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION
 
             # running mpc planner in parallel (xref has been updated in process_mpc)
             # start_time = time.time()
-            if type_MPC == False :
+            if optim_pieds == True :
                 mpc_planner.solve(k, fstep_planner.xref , interface.l_feet )
             # print("Temps d execution : %s secondes ---" % (time.time() - start_time)) 
 
@@ -175,17 +176,17 @@ def run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION
             #     o_feet_[:2, i , int(k/k_mpc)] = pos_tmp[0:2, 0]
 
         # Replace the fstep_invdyn by the ddp one
-        if type_MPC == False : 
+        if optim_pieds == True : 
             fstep_planner.fsteps_invdyn = mpc_planner.fsteps.copy()
 
         if k == 0:
-            if type_MPC == True : 
+            if optim_pieds == False : 
                 f_applied = mpc_wrapper.get_latest_result()
             else : 
                 f_applied = mpc_planner.get_latest_result()
         else:
             # Output of the MPC (with delay)
-            if type_MPC == True : 
+            if optim_pieds == False : 
                 f_applied = mpc_wrapper.get_latest_result()
             else : 
                 f_applied = mpc_planner.get_latest_result() 
