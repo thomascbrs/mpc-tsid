@@ -29,7 +29,7 @@ pyb_feedback = True
 
 # Desired speed
 # increasing by 0.1m.s-1 each second, and then 10s of simulation
-desired_speed =  [-0.14,  0.5 , 0. , 0. , 0. ,0.0]
+desired_speed =  [0.0,  0.5 , 0. , 0. , 0. ,0.0]
 
 #################
 # RUN SCENARIOS #
@@ -42,21 +42,21 @@ logger_ddp , logger_osqp = run_scenario(envID, velID, dt_mpc, k_mpc, t, n_period
 # RECORD LOGGERS
 #################
 
-pathIn = "crocoddyl_eval/test_1/log_eval/"
+# pathIn = "crocoddyl_eval/test_1/log_eval/"
 
-print("Saving logs...")
+# print("Saving logs...")
 
-np.save(pathIn +  "ddp_xs.npy" , logger_ddp.pred_trajectories )
-np.save(pathIn +  "ddp_us.npy" , logger_ddp.pred_forces )
+# np.save(pathIn +  "ddp_xs.npy" , logger_ddp.pred_trajectories )
+# np.save(pathIn +  "ddp_us.npy" , logger_ddp.pred_forces )
 
-np.save(pathIn +  "osqp_xs.npy" , logger_osqp.pred_trajectories )
-np.save(pathIn +  "osqp_us.npy" , logger_osqp.pred_forces )
+# np.save(pathIn +  "osqp_xs.npy" , logger_osqp.pred_trajectories )
+# np.save(pathIn +  "osqp_us.npy" , logger_osqp.pred_forces )
 
-np.save(pathIn +  "o_feet.npy" , logger_ddp.feet_pos )
-np.save(pathIn +  "fsteps.npy" , logger_ddp.fsteps )
-np.save(pathIn +  "xref.npy" , logger_ddp.xref )
-np.save(pathIn +  "oC.npy" , logger_ddp.oC )
-np.save(pathIn +  "o_shoulders.npy" , logger_ddp.o_shoulders )
+# np.save(pathIn +  "o_feet.npy" , logger_ddp.feet_pos )
+# np.save(pathIn +  "fsteps.npy" , logger_ddp.fsteps )
+# np.save(pathIn +  "xref.npy" , logger_ddp.xref )
+# np.save(pathIn +  "oC.npy" , logger_ddp.oC )
+# np.save(pathIn +  "o_shoulders.npy" , logger_ddp.o_shoulders )
 
 logger_ddp.plot_state()
 plt.show(block=True)

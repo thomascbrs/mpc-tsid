@@ -56,9 +56,10 @@ class MPC_crocoddyl:
         self.stateWeight = np.array([self.w_x,self.w_y,self.w_z,self.w_roll,self.w_pitch,self.w_yaw,
                                     self.w_vx,self.w_vy,self.w_vz,self.w_vroll,self.w_vpitch,self.w_vyaw])
 
-
         # Weight Vector : Force Norm
         self.forceWeights = np.array(4*[0.01,0.01,0.01])
+        self.relative_forces = True
+        # self.forceWeights = np.zeros(12)
 
         # Weight Vector : Friction cone cost
         self.frictionWeights = 1.0
@@ -260,6 +261,8 @@ class MPC_crocoddyl:
             #shoulder term : 
             elt.shoulderWeights = self.shoulderWeights
             elt.shoulder_hlim = self.shoulder_hlim
+
+            elt.relative_forces = self.relative_forces
         
         # Model parameters of terminal node    
         self.terminalModel.dt = self.dt 

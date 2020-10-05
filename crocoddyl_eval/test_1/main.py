@@ -188,11 +188,11 @@ def run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION
             t_list_mpc[k] = time.time() - time_mpc            
             print( int(k/k_mpc))
         if k <= 8000:
-            f_applied = mpc_wrapper_ddp.get_latest_result()
+            f_applied = mpc_wrapper_ddp_nl.get_latest_result()
         # elif (k % k_mpc) == 0:
         else:
             # Output of the MPC (with delay)
-            f_applied = mpc_wrapper_ddp.get_latest_result()
+            f_applied = mpc_wrapper_ddp_nl.get_latest_result()
 
         # Process Inverse Dynamics
         time_tsid = time.time()

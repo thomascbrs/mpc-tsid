@@ -8,7 +8,7 @@ sys.path.insert(0, os.getcwd()) # adds current directory to python path
 
 
 import numpy as np
-import matplotlib.pylab as plt
+import matplotlib.pylab as plt; plt.ion()
 import utils
 import time
 from TSID_Debug_controller_four_legs_fb_vel import controller, dt
@@ -49,7 +49,7 @@ print("x_ref : " + str(xref[:6,1, iteration  ]))
 print("\n")
 
 print("ddp1 --> ddp, gain of 0.01||f||^2")
-print("ddp2 --> ddp, gain of 0.||f||^2")
+print("ddp2 --> ddp, gain of 0.01||f-m*g/(nb contact)||^2 ")
 
 # Create footstep planner object
 fstep_planner = FootstepPlanner.FootstepPlanner(dt_mpc, n_periods, T_gait)
@@ -81,7 +81,8 @@ mpc_wrapper_ddp_2 = MPC_Wrapper.MPC_Wrapper(False, dt_mpc, fstep_planner.n_steps
 mpc_wrapper_ddp_2.mpc.max_iteration = 10 # The solver is not warm started here
 
 # Adjust the gain on the norm of the forces
-mpc_wrapper_ddp_2.mpc.forceWeights = np.array(12*[0.])
+mpc_wrapper_ddp_2.mpc.forceWeights = np.array(12*[0.01])
+mpc_wrapper_ddp_2.mpc.relative_forces = True
 mpc_wrapper_ddp_2.mpc.updateActionModel() #udpate
 mpc_wrapper_ddp_2.solve(1,fstep_planner)
 
@@ -104,7 +105,7 @@ for i in range(12):
     
     pl1, = plt.plot(l_t, mpc_wrapper_ddp_1.mpc.get_xrobot()[i,:], linewidth=2, marker='x')
     pl2, = plt.plot(l_t, mpc_wrapper_ddp_2.mpc.get_xrobot()[i,:], linewidth=2, marker='x')
-    plt.legend([pl1,pl2] , [l_str[i] , "ddp_no_gain" ])
+    plt.legend([pl1,pl2] , [l_str[i] , "ddp_rel" ])
     
     
 mu = 0.9
@@ -131,7 +132,7 @@ for i in range(12):
         
     pl1, = plt.plot(l_t, mpc_wrapper_ddp_1.mpc.get_fpredicted()[i,:], linewidth=2, marker='x')
     pl2, = plt.plot(l_t, mpc_wrapper_ddp_2.mpc.get_fpredicted()[i,:], linewidth=2, marker='x')
-    plt.legend([pl1,pl2] , [l_str[i], "ddp_no_gain" ])
+    plt.legend([pl1,pl2] , [l_str[i], "ddp_rel" ])
 
     
 

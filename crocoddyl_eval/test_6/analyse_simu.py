@@ -44,8 +44,9 @@ T_gait = 0.44  # Duration of one gait period
 # Parameters 
 ###################
 X_perturb = [0.0,0.0] # [X,Y]
-# V_perturb = [0.0,0.26]  # V = [Vx , Vy]
-V_perturb = [0.0,0.0]
+V_perturb = [0.1,0.0]
+
+
 # Plot cost 1D : 
 cost_1D = True
 Dt_list = [0.02,0.02,0.02]
@@ -73,20 +74,23 @@ mpc_planner_time.dt_weight_bound = 0.
 mpc_planner_time.vlim = 1.5
 mpc_planner_time.heuristicWeights = np.full(8,0.0)
 mpc_planner_time.lastPositionWeights = np.zeros(8)
+mpc_planner_time.forceWeights = np.array(12*[0.01])
+
+mpc_planner_time.relative_forces = True
 
 # Step DT Weights : 
-mpc_planner_time.dt_weight_cmd = 0. # Weight on ||U-dt_ref||
+mpc_planner_time.dt_weight_cmd = 1000. # Weight on ||U-dt_ref||
+mpc_planner_time.dt_ref = 0.05
 mpc_planner_time.dt_weight_bound_cmd = 100000.
 
 # Step feet Weights : 
-mpc_planner_time.speed_weight = 100.
-mpc_planner_time.stepWeights = np.full(4,0.8)
+mpc_planner_time.speed_weight = 0.
+mpc_planner_time.stepWeights = np.full(4,1. )
 
-dt_init = 0.01
+dt_init = 0.02
 
 term_factor = 10
-Dt_stop = [False,False,False]
-cmd_weight = mpc_planner_time.dt_weight_cmd 
+Dt_stop = [False,True,True]
 
 ######################################
 #  DDP FEET OPTIMISATION             #
@@ -275,6 +279,7 @@ if cost_1D :
     plt.title("Cost Function wrt dt" , fontsize=10)
 
 
+# run_planner(Dt_list,V_perturb)
 # Vx2 = np.array(mpc_planner.ddp.Vx)
 # plt.figure()
 # plt.plot(np.arange(Vx2.shape[0]) , Vx2[:,10])
@@ -352,7 +357,7 @@ if cost_3D :
 
 
 
-# run_planner(Dt_list,V_perturb)
+run_planner(Dt_list,V_perturb)
 
 ####################################################
 # DDP PERIOD OPTIMISATION                          #
@@ -387,7 +392,6 @@ x1 = np.zeros(21)
 x1[2] = 0.2027
 x1[-1] = dt_init
 u1 = np.array([0.1,0.1,8,0.1,0.1,8,0.1,0.1,8,0.1,0.1,8])
-
 x_init = []
 u_init = []
 # Iterate over all phases of the gait
@@ -399,9 +403,10 @@ while (gait[j, 0] != 0):
             modelTime = quadruped_walkgen.ActionModelQuadrupedTime()
             modelTime.updateModel(np.reshape(l_fsteps, (3, 4), order='F') , xref[:, i]  , gait[j, 1:]) 
             
-            modelTime.dt_weight_cmd = mpc_planner_time.dt_weight_cmd*Dt_stop[0]
+            
             # Update intern parameters
             mpc_planner_time.update_model_step_time(modelTime , True)
+            modelTime.dt_weight_cmd = mpc_planner_time.dt_weight_cmd*Dt_stop[0]
             ListAction.append(modelTime)   
             x_init.append(x1)
             u_init.append(np.array([dt_init]))
@@ -433,14 +438,16 @@ while (gait[j, 0] != 0):
     if np.sum(gait[j+1, 1:]) == 2 and j >= 1 :    
 
         modelTime = quadruped_walkgen.ActionModelQuadrupedTime()
+        
+            
+        modelTime.updateModel(np.reshape(l_fsteps, (3, 4), order='F') , xref[:, i+1]  , gait[j, 1:]) 
+        
+        # Update intern parameters
+        mpc_planner_time.update_model_step_time(modelTime , True)
         if  j== 1 :
             modelTime.dt_weight_cmd = mpc_planner_time.dt_weight_cmd*Dt_stop[1]
         if  j== 3 :
             modelTime.dt_weight_cmd = mpc_planner_time.dt_weight_cmd*Dt_stop[2]
-            
-        modelTime.updateModel(np.reshape(l_fsteps, (3, 4), order='F') , xref[:, i+1]  , gait[j, 1:]) 
-        # Update intern parameters
-        mpc_planner_time.update_model_step_time(modelTime , True)
         ListAction.append(modelTime)   
         x_init.append(x1)
         u_init.append(np.array([dt_init]))
@@ -467,8 +474,8 @@ problem = crocoddyl.ShootingProblem(np.zeros(21),  ListAction, terminalModel)
 problem.x0 = np.concatenate([xref[:,0] , p0 , [dt_init]   ])
 ddp = crocoddyl.SolverDDP(problem)
 ddp.solve(x_init,u_init,500)
-print(ddp.iter)
-print(ddp.cost)
+print("iter : " , ddp.iter)
+print("cost : " , ddp.cost)
 ddp.backwardPass()
 Vx = np.array(ddp.Vx)
 Vxx = np.array(ddp.Vxx)
@@ -493,15 +500,15 @@ Us = ddp.us
 Liste = [x for x in Us if (x.size != 4 and x.size != 1) ]
 Us =  np.array(Liste)[:,:].transpose()
 
-Xs = np.zeros((21,int(T_gait/dt_mpc)*n_periods + int(np.sum(gait[:2,0])) ))
-k = 0
-index = 1
-for elt in ListAction :
+Xs = np.zeros((21, int(np.sum(gait[:,0])) + 1 )) # +1 for terminal node
+
+k = 0 #initial state 
+index = 0
+for index,elt in enumerate(ListAction) :
     if elt.__class__.__name__ != "ActionModelQuadrupedStepTime" and  elt.__class__.__name__ != "ActionModelQuadrupedTime": 
         Xs[:,k ] = np.array(ddp.xs[index])
         k = k+1
-    index += 1
-
+Xs[:,-1] = ddp.xs[-1] # terminal node
 j = 0
 k_cum = 0
 
@@ -522,15 +529,14 @@ while (gait[j, 0] != 0):
     j += 1      
 
 l_t2 =  [0.]
-
 k_cum = 0 
 for i,elt in enumerate(ListDt) :    
     for j in range(int(gait[i,0])) : 
         l_t2.append(l_t2[-1] + elt)
 
 lt_cost = l_t2.copy()
-lt_cost.append(lt_cost[-1] + ListDt[-1]) # for temrinal cost
-l_t2.pop(0)
+# lt_cost.append(lt_cost[-1] + ListDt[-1]) # for temrinal cost
+# l_t2.pop(0)
 l_t2 = np.array(l_t2)
 
 print("Results optim : ")
@@ -588,19 +594,26 @@ frictionCost = np.zeros(len(lt_cost) )
 deltaFoot = np.zeros(len(lt_cost))
 speedCost = np.zeros(len(lt_cost))
 dtCmdBound = np.zeros(len(lt_cost))
+dtCmdRef = np.zeros(len(lt_cost))
 
 gap = 0
 x_dt_change = []
 x_foot_change = []
 y = 0.02
 for index,elt in enumerate(ListAction ):
+    print(elt.Cost)
     if elt.__class__.__name__ == "ActionModelQuadrupedAugmentedTime" :  
         stateCost[index-gap] = elt.Cost[0]
+        print(index)
+        print(index-gap)
+        print(elt.Cost[0])
+        print(elt.__class__.__name__)
         forceCost[index-gap] = elt.Cost[2]
         frictionCost[index-gap] = elt.Cost[5]
     elif elt.__class__.__name__ == "ActionModelQuadrupedTime" :     
         x_dt_change.append(lt_cost[index-gap])
         dtCmdBound[index-gap] = elt.Cost[3]
+        dtCmdRef[index-gap] = elt.Cost[2]
         gap += 1
         
     else : 
@@ -608,12 +621,13 @@ for index,elt in enumerate(ListAction ):
         speedCost[index-gap] = elt.Cost[3]
         deltaFoot[index-gap] = elt.Cost[2]
         gap += 1
-# stateCost[index-gap + 1] = terminalModel.Cost[0]
+
+stateCost[- 1] = terminalModel.Cost[0]
 for elt in x_foot_change : 
-    pl7 = plt.axvline(x=elt,color='gray',linestyle='--')
+    pl8 = plt.axvline(x=elt,color='gray',linestyle='--')
 
 for elt in x_dt_change : 
-    pl8 = plt.axvline(x=elt,color='gray',linestyle=(0, (1, 10)) )
+    pl9 = plt.axvline(x=elt,color='gray',linestyle=(0, (1, 10)) )
 
 
 pl1, = plt.plot(lt_cost,stateCost , "-x" , color = "b")
@@ -622,17 +636,19 @@ pl3, = plt.plot(lt_cost,frictionCost , "-x")
 pl4, = plt.plot(lt_cost,deltaFoot , "-x" , color = "k")
 pl5, = plt.plot(lt_cost,speedCost , "-x" )
 pl6, = plt.plot(lt_cost,dtCmdBound , "-x")
-plt.legend([pl1,pl2,pl3,pl4,pl5,pl6,pl7,pl8] , ["State cost" , "Norm Force" , "Friction"   , "Norm delta foot" , "Speed cost" , "cmd_dt -+ bounds (dt) " ,
+pl7, = plt.plot(lt_cost, dtCmdRef , "-x")
+plt.legend([pl1,pl2,pl3,pl4,pl5,pl6,pl7,pl8,pl9] , ["State cost" , "Norm Force" , "Friction"   , "Norm delta foot" , "Speed cost" , "cmd_dt -+ bounds (dt) " , "dt ref cmd",
                                                      "Foot step" , "dt change"])
-plt.title("Total Cost : " + str(ddp.cost))
+plt.title("Total Cost : " + str(ddp.cost) + "   /   ddp.iter : " + str(ddp.iter))
 txt = "dt min : " + str(mpc_planner_time.dt_min) + "\n" + "dt max : " + str(mpc_planner_time.dt_max) + " \n " + " \n"  
 txt += "Optim : \n" + "dt1 : " + str(np.around(ListDt[0],decimals = 4)) + "\ndt2 : " + str(np.around(ListDt[2],decimals = 4))
 txt +=  "\ndt3 : " + str(np.around(ListDt[4],decimals = 4)) 
 txt += "\n\n\n"
 txt += "Vy initial : " + str(V_perturb[1])
+txt += "\nVx initial : " + str(V_perturb[0])
 txt += "\n"
 txt += "dt init : " + str(dt_init)
-plt.text(-0.5,0.01,txt)
+plt.text(-20*lt_cost[1],0.0,txt)
 plt.subplots_adjust(left=0.25)
 plt.xlabel("t [s]")
 plt.ylabel("cost")
@@ -653,6 +669,10 @@ plt.ylabel("cost")
 # print(ddp.Vxx[5][20,20])
 # print(ddp.Vxx[6][20,20])
 
+print("\n")
+print("ddp --> dt opt")
+print("mpc_planner.ddp  --> dt fixed")
+
 
 ################""
 
@@ -661,45 +681,81 @@ plt.ylabel("cost")
 #  Plot     #
 #############
 
+# Adding initial state : 
+Xs_planner = np.zeros((mpc_planner.Xs.shape[0] , mpc_planner.Xs.shape[1]+1))
+Xs_planner[:,0] = mpc_planner.ddp.xs[0]
+Xs_planner[:,1:] =  mpc_planner.Xs
+
 # Predicted evolution of state variables
-l_t = np.linspace(dt_mpc, T_gait + dt_mpc + dt_mpc*gait[0,0], np.int(T_gait/dt_mpc)*n_periods + int(np.sum(gait[:2,0])))
+l_t = np.linspace(0, (int(np.sum(gait[:,0])))*dt_mpc , int(np.sum(gait[:,0])) + 1 )
 
 l_str2 = ["X_ddp", "Y_ddp", "Z_ddp", "Roll_ddp", "Pitch_ddp", "Yaw_ddp", "Vx_ddp", "Vy_ddp", "Vz_ddp", "VRoll_ddp", "VPitch_ddp", "VYaw_ddp"]
 
 index = [1, 5, 9, 2, 6, 10, 3, 7, 11, 4, 8, 12]
 plt.figure()
+
+plt.suptitle("State prediction : comparison between control cycle with dt = 0.02 fixed and dt optimisation")
 for i in range(12):
     plt.subplot(3, 4, index[i])
+    for elt in x_dt_change : 
+        pl3 = plt.axvline(x=elt,color='gray',linestyle=(0, (1, 10)) , label = "dt change")
+    
+    for elt in x_foot_change : 
+        pl4 = plt.axvline(x=elt,color='gray',linestyle='--'  , label = "foot step")
        
 
     if Relaunch_DDP and not Relaunch_TIME: 
-        pl1, = plt.plot(l_t, mpc_planner.Xs[i,:], linewidth=2, marker='x')
+        pl1, = plt.plot(l_t, Xs_planner[i,:], linewidth=2, marker='x')
         plt.legend([pl1] , [l_str2[i]])
 
     else  : 
-        pl1, = plt.plot(l_t, mpc_planner.Xs[i,:], linewidth=2, marker='x')
-        pl2, = plt.plot(l_t2, Xs[i,:], linewidth=2, marker='x')
-        plt.legend([pl1,pl2] , [l_str2[i] ,  "ddp_time" ])
+        pl1, = plt.plot(l_t, Xs_planner[i,:], linewidth=2, marker='x' , label = l_str2[i])
+        pl2, = plt.plot(l_t2, Xs[i,:], linewidth=2, marker='x' , label = "ddp_time")
+        first_legend = plt.legend(handles=[pl1,pl2])
+        ax = plt.gca().add_artist(first_legend)
        
 
-    
+plt.legend(handles=[pl3, pl4], title='Legend for time optim : ', bbox_to_anchor=(1.05, 1), loc='upper left')
 
+
+
+# No terminal point 
+l_t2 =  [0.]
+k_cum = 0 
+for i,elt in enumerate(ListDt) :    
+    for j in range(int(gait[i,0])) : 
+        l_t2.append(l_t2[-1] + elt)
+
+l_t2.pop(-1)
+l_t2 = np.array(l_t2)
+
+l_t = np.linspace(0, (int(np.sum(gait[:,0])) - 1)*dt_mpc , int(np.sum(gait[:,0])) ) # No terminal command
 # Desired evolution of contact forces
 l_str2 = ["FL_X_ddp", "FL_Y_ddp", "FL_Z_ddp", "FR_X_ddp", "FR_Y_ddp", "FR_Z_ddp", "HL_X_ddp", "HL_Y_ddp", "HL_Z_ddp", "HR_X_ddp", "HR_Y_ddp", "HR_Z_ddp"]
 index = [1, 5, 9, 2, 6, 10, 3, 7, 11, 4, 8, 12]
 plt.figure()
+plt.suptitle("Contact forces : comparison between control cycle with dt = 0.02 fixed and dt optimisation")
 for i in range(12):
     plt.subplot(3, 4, index[i])    
+    for elt in x_dt_change : 
+        pl3 = plt.axvline(x=elt,color='gray',linestyle=(0, (1, 10)) , label = "dt change")
+    
+    for elt in x_foot_change : 
+        pl4 = plt.axvline(x=elt,color='gray',linestyle='--' , label = "foot step")
    
     if Relaunch_DDP and not Relaunch_TIME: 
         pl1, = plt.plot(l_t,mpc_planner.Us[i,:], linewidth=2, marker='x')
         plt.legend([pl1] , [l_str2[i] ])
 
     else : 
-        pl1, = plt.plot(l_t,mpc_planner.Us[i,:], linewidth=2, marker='x')
-        pl2, = plt.plot(l_t2,Us[i,:], linewidth=2, marker='x')
-        plt.legend([pl1,pl2] , [l_str2[i] , "ddp_time" ])
-    
+        pl1, = plt.plot(l_t,mpc_planner.Us[i,:], linewidth=2, marker='x' , label = l_str2[i] )
+        pl2, = plt.plot(l_t2,Us[i,:], linewidth=2, marker='x' , label = "ddp_time")
+
+        first_legend = plt.legend(handles=[pl1,pl2])
+        ax = plt.gca().add_artist(first_legend)
+        # plt.legend([pl1,pl2] , [l_str2[i] , "ddp_time" ])
+
+plt.legend(handles=[pl3, pl4], title='Legend for time optim : ', bbox_to_anchor=(1.05, 1), loc='upper left')
 
 plt.figure()
 
@@ -754,50 +810,7 @@ for i in range(4) :
                 plt.plot(fsteps[k,3*i+1] , fsteps[k,3*i+2] , "ko" , markerSize = int(20/np.sqrt(k)) ,  markerfacecolor='none')
             if i == 3 :
                 plt.plot(fsteps[k,3*i+1] , fsteps[k,3*i+2] , "go" , markerSize = int(20/np.sqrt(k)) ,  markerfacecolor='none')
-    
 
-# for i in range(len(ListAction)) :     
-#     x = np.random.rand(20)
-#     x2 = np.zeros(21)
-#     x2[0:20] = x
-#     x2[-1] = 0.02
-
-#     u = np.random.rand(12)
-#     if ListAction[i].__class__.__name__ == "ActionModelQuadrupedStepTime" : 
-#         u = np.random.rand(4)
-#         print("step")
-
-           
-
-#     action =  mpc_planner.ListAction[i]
-#     data = action.createData()    
-#     action.calc(data,x,u)
-#     action.calcDiff(data,x,u)
-
-#     action2 =  ListAction[i]
-#     data2 = action2.createData()
-#     action2.calc(data2,x2,u)
-#     action2.calcDiff(data2,x2,u)
-
-#     # if np.sum(data.xnext - data2.xnext[:20]) != 0 :
-#     #     print(i)
-#     # print(data.r - data2.r[:24])
-#     # print(data.Lx - data2.Lx[:20])
-#     # print(data2.xnext)
-    
-#     if np.sum(np.round(data.cost,decimals = 3) - np.round(data2.cost, decimals = 3)) != 0 :
-#         print(data.cost)
-#         print(data2.cost)
-#         print(i)
-#     #     print(i)
-
-
-# print(np.round(action2.B[9:,:], decimals = 2))
-# print(np.round(action.B[9:,:], decimals = 2))
-
-
-
-# print(xref[:,:, iteration])
 plt.show(block=True)
 
 

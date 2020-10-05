@@ -174,6 +174,8 @@ class MPC_crocoddyl_planner_time():
         # States
         # Heuristic position
 
+        self.relative_forces = False
+
         
 
 
@@ -357,6 +359,8 @@ class MPC_crocoddyl_planner_time():
         model.dt_weight_bound = 0.
         model.dt_min = self.dt_min
         model.dt_max = self.dt_max
+
+        model.relative_forces = self.relative_forces
 
         if optim_period : 
             model.heuristicWeights =  np.zeros(8)
