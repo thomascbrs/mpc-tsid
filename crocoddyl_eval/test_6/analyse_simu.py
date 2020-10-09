@@ -8,6 +8,7 @@ sys.path.insert(0, os.getcwd()) # adds current directory to python path
 
 import random
 import numpy as np
+# import matplotlib.pylab as plt; plt.ion()
 import matplotlib.pylab as plt
 import utils
 import time
@@ -44,11 +45,11 @@ T_gait = 0.44  # Duration of one gait period
 # Parameters 
 ###################
 X_perturb = [0.0,0.0] # [X,Y]
-V_perturb = [0.1,0.0]
+V_perturb = [0.01,0.0]
 
 
 # Plot cost 1D : 
-cost_1D = True
+cost_1D = False
 Dt_list = [0.02,0.02,0.02]
 Dt_free = [True, False,False]
 
@@ -80,8 +81,8 @@ mpc_planner_time.relative_forces = True
 
 # Step DT Weights : 
 mpc_planner_time.dt_weight_cmd = 1000. # Weight on ||U-dt_ref||
-mpc_planner_time.dt_ref = 0.05
-mpc_planner_time.dt_weight_bound_cmd = 100000.
+mpc_planner_time.dt_ref = 0.02
+mpc_planner_time.dt_weight_bound_cmd = 100000000.
 
 # Step feet Weights : 
 mpc_planner_time.speed_weight = 0.
@@ -90,7 +91,7 @@ mpc_planner_time.stepWeights = np.full(4,1. )
 dt_init = 0.02
 
 term_factor = 10
-Dt_stop = [False,True,True]
+Dt_stop = [False,True,False]
 
 ######################################
 #  DDP FEET OPTIMISATION             #
@@ -476,11 +477,11 @@ ddp = crocoddyl.SolverDDP(problem)
 ddp.solve(x_init,u_init,500)
 print("iter : " , ddp.iter)
 print("cost : " , ddp.cost)
-ddp.backwardPass()
-Vx = np.array(ddp.Vx)
-Vxx = np.array(ddp.Vxx)
-plt.figure()
-pl1, = plt.plot(np.arange(Vx.shape[0]) , Vx[:,20])
+# ddp.backwardPass()
+# Vx = np.array(ddp.Vx)
+# Vxx = np.array(ddp.Vxx)
+# plt.figure()
+# pl1, = plt.plot(np.arange(Vx.shape[0]) , Vx[:,20])
 # pl2, = plt.plot(np.arange(Vxx.shape[0]) , Vxx[:,20,20])
 # plt.legend([pl1,pl2] , ["Vx","Vxx"])
 # [state,   heur,   ||x21-dtref||  ,   ||u||12        , previous , friction  , X_bounds ] Augmented
@@ -501,6 +502,8 @@ Liste = [x for x in Us if (x.size != 4 and x.size != 1) ]
 Us =  np.array(Liste)[:,:].transpose()
 
 Xs = np.zeros((21, int(np.sum(gait[:,0])) + 1 )) # +1 for terminal node
+Xs2 = [ddp.xs[i] for i in range(len(ddp.us)) if (ddp.us[i].size != 4 and ddp.us[i].size != 1) ]
+Xs2.append(ddp.xs[-1])
 
 k = 0 #initial state 
 index = 0
@@ -601,13 +604,12 @@ x_dt_change = []
 x_foot_change = []
 y = 0.02
 for index,elt in enumerate(ListAction ):
-    print(elt.Cost)
     if elt.__class__.__name__ == "ActionModelQuadrupedAugmentedTime" :  
         stateCost[index-gap] = elt.Cost[0]
-        print(index)
-        print(index-gap)
-        print(elt.Cost[0])
-        print(elt.__class__.__name__)
+        # print(index)
+        # print(index-gap)
+        # print(elt.Cost[0])
+        # print(elt.__class__.__name__)
         forceCost[index-gap] = elt.Cost[2]
         frictionCost[index-gap] = elt.Cost[5]
     elif elt.__class__.__name__ == "ActionModelQuadrupedTime" :     

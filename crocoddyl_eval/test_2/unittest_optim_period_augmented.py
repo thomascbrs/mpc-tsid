@@ -12,7 +12,7 @@ import matplotlib.pylab as plt
 import quadruped_walkgen 
 import crocoddyl
 
-N_trial = 500
+N_trial = 1
 a = -1 
 b = 1 
 c = -10 
@@ -27,12 +27,13 @@ epsilon = 1e-3
 
 actionModel = quadruped_walkgen.ActionModelQuadrupedAugmentedTime()
 
-# actionModel.heuristicWeights  =  np.zeros(8)
+actionModel.heuristicWeights  =  np.zeros(8)
 actionModel.lastPositionWeights = np.zeros(8)
 actionModel.frictionWeights = 0.
-# actionModel.stateWeights = np.zeros(12)
+actionModel.stateWeights = np.zeros(12)
 # actionModel.forceWeights = np.zeros(12)
-actionModel.dt_weight_bound = 10.
+actionModel.dt_weight_bound = 0.
+actionModel.relative_forces = True
 data = actionModel.createData()
 
 # RUN CALC DIFF
@@ -50,7 +51,9 @@ def run_calcDiff_numDiff(epsilon) :
   Fx = 0
   Fx_err = 0 
   Fu = 0
-  Fu_err = 0    
+  Fu_err = 0  
+  Lxu = 0
+  Lxu_err = 0  
 
   for k in range(N_trial):    
 
@@ -60,7 +63,15 @@ def run_calcDiff_numDiff(epsilon) :
 
     l_feet = np.random.rand(3,4)
     xref = np.random.rand(12)
-    S = np.array([1,0,0,1])
+
+    nb = np.random.rand(1)[0]
+    if nb < 0.33 : 
+      S = np.array([1,0,0,1])
+    elif nb < 0.66 : 
+      S = np.array([0,1,1,0])
+    else : 
+      S = np.array([1,1,1,1])
+      
 
     actionModel.updateModel(l_feet , xref , S )
     model_diff = crocoddyl.ActionModelNumDiff(actionModel)
@@ -94,20 +105,21 @@ def run_calcDiff_numDiff(epsilon) :
     Fu +=  np.sum( abs((data.Fu - dataCpp.Fu )) >= epsilon  ) 
     Fu_err += np.sum( abs((data.Fu - dataCpp.Fu )) )  
 
+    Lxu +=  np.sum( abs((data.Lxu - dataCpp.Lxu )) >= epsilon  ) 
+    Lxu_err += np.sum( abs((data.Lxu - dataCpp.Lxu )) ) 
 
-
-  
   Lx_err = Lx_err /N_trial
   Lu_err = Lu_err/N_trial
   Lxx_err = Lxx_err/N_trial    
   Luu_err = Luu_err/N_trial
   Fx_err = Fx_err/N_trial
   Fu_err = Fu_err/N_trial
+  Lxu_err = Lxu_err/N_trial
   
-  return Lx , Lx_err , Lu , Lu_err , Lxx , Lxx_err , Luu , Luu_err,   Fx, Fx_err, Fu , Fu_err
+  return Lx , Lx_err , Lu , Lu_err , Lxx , Lxx_err , Luu , Luu_err,   Fx, Fx_err, Fu , Fu_err , Lxu , Lxu_err
 
 
-Lx , Lx_err , Lu , Lu_err , Lxx , Lxx_err , Luu , Luu_err ,  Fx, Fx_err, Fu , Fu_err = run_calcDiff_numDiff(epsilon)
+Lx , Lx_err , Lu , Lu_err , Lxx , Lxx_err , Luu , Luu_err ,  Fx, Fx_err, Fu , Fu_err , Lxu , Lxu_err = run_calcDiff_numDiff(epsilon)
 
 print("\n \n")
 print(" Action model class, step for position of foot, with time augmented state vector (nx = 21 , nu = 4) ")
@@ -144,6 +156,9 @@ else :     print("Lxx : NOT OK !!!   (error : %f)" %Lxx_err)
 
 if Luu == 0:  print("Luu : OK    (error : %f)" %Luu_err)
 else :     print("Luu : NOT OK !!!   (error : %f)" %Luu_err)
+
+if Lxu == 0:  print("Lxu : OK    (error : %f)" %Lxu_err)
+else :     print("Lxu : NOT OK !!!   (error : %f)" %Lxu_err)
 
 
 

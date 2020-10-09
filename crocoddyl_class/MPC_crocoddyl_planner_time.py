@@ -123,8 +123,8 @@ class MPC_crocoddyl_planner_time():
         self.dt_min = self.T_gait_min / N_nodes
         self.dt_max = self.T_gait_max / N_nodes
         self.dt_weight_bound = 50000
-        print("dt_min : " , self.dt_min)
-        print("dt_max : " , self.dt_max)
+        # print("dt_min : " , self.dt_min)
+        # print("dt_max : " , self.dt_max)
 
         # Weight for period optim
         self.vlim = 2.
@@ -356,7 +356,7 @@ class MPC_crocoddyl_planner_time():
         model.centrifugal_term = self.centrifugal_term
         model.dt_ref = self.dt_ref
         model.dt_weight = 0.
-        model.dt_weight_bound = 0.
+        model.dt_weight_bound = self.dt_weight_bound
         model.dt_min = self.dt_min
         model.dt_max = self.dt_max
 

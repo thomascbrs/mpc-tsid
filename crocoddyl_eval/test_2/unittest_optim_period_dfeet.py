@@ -23,10 +23,11 @@ epsilon = 1e-3
 #################################################
 
 actionModel = quadruped_walkgen.ActionModelQuadrupedStepTime()
-# actionModel.heuristicWeights =  np.zeros(8) # weight on the heuristic optim of the feet
-# actionModel.stateWeights = np.zeros(12) # State weight
+actionModel.heuristicWeights =  np.zeros(8) # weight on the heuristic optim of the feet
+actionModel.stateWeights = np.zeros(12) # State weight
+actionModel.vlim = 
 # actionModel.speed_weight = 0.
-# actionModel.stepWeights = np.zeros(4)
+actionModel.stepWeights = np.zeros(4)
 data = actionModel.createData()
 
 # RUN CALC DIFF
