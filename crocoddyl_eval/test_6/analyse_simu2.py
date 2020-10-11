@@ -49,7 +49,7 @@ T_gait = 0.44  # Duration of one gait period
 
 # Perturbation
 X_perturb = [0.0,0.0] # [X,Y]
-V_perturb = [1.5,0. ]
+V_perturb = [0.2,0. ]
 
 # Cost weights
 # Augmented state weights : 
@@ -62,21 +62,23 @@ relative_forces = True                 # ||fz-mg/nb_contact||^2
 # Step DT Weights : 
 dt_weight_cmd = 10000. # Weight on ||U-dt_ref|| --> Fix dt value
 dt_ref = 0.02
-dt_weight_bound_cmd = 1000000.    # (dt_min - dt)^+ ; (dt-dt_max)^+
+dt_weight_bound_cmd = 100000.    # (dt_min - dt)^+ ; (dt-dt_max)^+
 
 Dt_stop1 = [False,False,False]  
 dt_ref1 = [0.02 , 0.02 , 0.02]
 
-Dt_stop2 = [True,True,True]  
+Dt_stop2 = [False,False,False]  
 dt_ref2 = [0.011 , 0.011 , 0.011]
 
 # Step feet Weights : 
-vlim = 0.2
-speed_weight = 0.
-stepWeights = np.full(4,0.001 )
+vlim = 2.5
+speed_weight1 = 0.
+speed_weight2 = 0.
+stepWeights1 = np.full(4,0.1 )
+stepWeights2 = np.full(4,0.0 )
 
 # terminal node
-term_factor = 10
+term_factor = 2
 
 # Initialisation
 #dt_init = 0.015
@@ -107,8 +109,8 @@ mpc_planner_time.dt_ref = dt_ref
 mpc_planner_time.dt_weight_bound_cmd = dt_weight_bound_cmd
 
 # Step feet Weights 1 : 
-mpc_planner_time.speed_weight = speed_weight
-mpc_planner_time.stepWeights = stepWeights
+mpc_planner_time.speed_weight = speed_weight1
+mpc_planner_time.stepWeights = stepWeights1
 ###################
 # MPC optim period 2
 mpc_planner_time_2 = MPC_crocoddyl_planner_time(dt = dt_mpc , T_mpc = T_gait , n_periods = n_periods , min_fz = 1)
@@ -127,8 +129,8 @@ mpc_planner_time_2.dt_ref = dt_ref
 mpc_planner_time_2.dt_weight_bound_cmd = dt_weight_bound_cmd
 
 # Step feet Weights : 
-mpc_planner_time_2.speed_weight = speed_weight
-mpc_planner_time_2.stepWeights = stepWeights
+mpc_planner_time_2.speed_weight = speed_weight2
+mpc_planner_time_2.stepWeights = stepWeights2
 
 
 #################################
@@ -164,7 +166,7 @@ p0 +=  np.repeat(gait[0,1:],2)*l_feet[0:2,:].reshape(8, order = 'F')
 # DDP PERIOD OPTIMISATION                          #
 ####################################################
 
-def run_MPC_optim_period(mpc_planner_time ,  Dt_stop , dt_ref) : 
+def run_MPC_optim_period(mpc ,  Dt_stop , dt_ref , nb_mpc) : 
 
     # Perturbation 
     xref[6,0] = V_perturb[0]
@@ -194,8 +196,8 @@ def run_MPC_optim_period(mpc_planner_time ,  Dt_stop , dt_ref) :
                 modelTime.updateModel(np.reshape(l_fsteps, (3, 4), order='F') , xref[:, i]  , gait[j, 1:]) 
                                 
                 # Update intern parameters
-                mpc_planner_time.update_model_step_time(modelTime , True)
-                modelTime.dt_weight_cmd = mpc_planner_time.dt_weight_cmd*Dt_stop[0]
+                mpc.update_model_step_time(modelTime , True)
+                modelTime.dt_weight_cmd = mpc.dt_weight_cmd*Dt_stop[0]
                 modelTime.dt_ref = dt_ref[0]
                 ListAction.append(modelTime)   
                 x_init.append(x1)
@@ -204,7 +206,7 @@ def run_MPC_optim_period(mpc_planner_time ,  Dt_stop , dt_ref) :
             
 
             model = quadruped_walkgen.ActionModelQuadrupedAugmentedTime()
-            mpc_planner_time.update_model_augmented(model ,True)
+            mpc.update_model_augmented(model ,True)
 
             model.updateModel(np.reshape(l_fsteps, (3, 4), order='F') , xref[:, i+1]  , gait[j, 1:])
             # Update intern parameters
@@ -216,10 +218,16 @@ def run_MPC_optim_period(mpc_planner_time ,  Dt_stop , dt_ref) :
         if np.sum(gait[j+1, 1:]) == 4 : # No optimisation on the first line     
         
             model = quadruped_walkgen.ActionModelQuadrupedStepTime()
-            mpc_planner_time.update_model_step_feet(model , True)
+            mpc.update_model_step_feet(model , True)
+
+            if nb_mpc == 1 :
+                model.speed_weight = speed_weight1
+            else : 
+                model.speed_weight = 0.
         
 
             model.updateModel(np.reshape(l_fsteps, (3, 4), order='F') , xref[:, i+1]  ,  gait[j+1, 1:] - gait[j, 1:])
+            model.nb_nodes = gait[j,0]
             # Update intern parameters
             ListAction.append(model)
             x_init.append(x1)
@@ -233,12 +241,12 @@ def run_MPC_optim_period(mpc_planner_time ,  Dt_stop , dt_ref) :
             modelTime.updateModel(np.reshape(l_fsteps, (3, 4), order='F') , xref[:, i+1]  , gait[j, 1:]) 
             
             # Update intern parameters
-            mpc_planner_time.update_model_step_time(modelTime , True)
+            mpc.update_model_step_time(modelTime , True)
             if  j== 1 :
-                modelTime.dt_weight_cmd = mpc_planner_time.dt_weight_cmd*Dt_stop[1]
+                modelTime.dt_weight_cmd = mpc.dt_weight_cmd*Dt_stop[1]
                 modelTime.dt_ref = dt_ref[1]
             if  j== 3 :
-                modelTime.dt_weight_cmd = mpc_planner_time.dt_weight_cmd*Dt_stop[2]
+                modelTime.dt_weight_cmd = mpc.dt_weight_cmd*Dt_stop[2]
                 modelTime.dt_ref = dt_ref[2]
             ListAction.append(modelTime)   
             x_init.append(x1)
@@ -251,7 +259,7 @@ def run_MPC_optim_period(mpc_planner_time ,  Dt_stop , dt_ref) :
     # Model parameters of terminal node  
     terminalModel = quadruped_walkgen.ActionModelQuadrupedAugmentedTime()
     terminalModel.updateModel(np.reshape(l_fsteps, (3, 4), order='F') , xref[:, -1]  , gait[j-1, 1:]) 
-    mpc_planner_time.update_model_augmented(terminalModel , True)
+    mpc.update_model_augmented(terminalModel , True)
     x_init.append(np.zeros(21))
     # Weights vectors of terminal node
     terminalModel.forceWeights = np.zeros(12)
@@ -356,8 +364,8 @@ def get_results(ddp) :
 ###############################################################################################################################
 
 # Run optim 1 & 2 
-ddp1 = run_MPC_optim_period(mpc_planner_time , Dt_stop1 , dt_ref1 )
-ddp2 = run_MPC_optim_period(mpc_planner_time , Dt_stop2 ,  dt_ref2)
+ddp1 = run_MPC_optim_period(mpc_planner_time , Dt_stop1 , dt_ref1 , 1 )
+ddp2 = run_MPC_optim_period(mpc_planner_time_2 , Dt_stop2 ,  dt_ref2 , 2)
 #ddp1.solve(ddp2.xs,ddp2.us,10000,isFeasible=True)
 #get results
 Xs_1 , Us_1 , lt_state_1 , lt_force_1 , Cost_1 , x_dt_change_1 , x_foot_change_1 , results_dt_1 , fsteps_1 = get_results(ddp1)

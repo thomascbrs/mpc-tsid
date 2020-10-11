@@ -24,8 +24,8 @@ epsilon = 1e-3
 
 actionModel = quadruped_walkgen.ActionModelQuadrupedTime()
 
-actionModel.dt_weight_bound_cmd = 100. # Upper/lower penalisation
-actionModel.dt_weight_cmd = 10. # \weight*||U-dt_ref||^2
+actionModel.dt_weight_bound_cmd = 1. # Upper/lower penalisation
+actionModel.dt_weight_cmd = 1. # \weight*||U-dt_ref||^2
 # actionModel.heuristicWeights =  np.zeros(8) # weight on the heuristic optim of the feet
 # actionModel.stateWeights = np.zeros(12) # State weight
 data = actionModel.createData()
@@ -50,8 +50,9 @@ def run_calcDiff_numDiff(epsilon) :
   for k in range(N_trial):    
 
     x = a + (b-a)*np.random.rand(21)
-    x[-1] = np.random.rand(1)[0] #dt > 0 
-    u = np.random.rand(1)
+    x[-1] = np.random.rand(1)[0] #dt > 0
+ 
+    
 
     l_feet = np.random.rand(3,4)
     xref = np.random.rand(12)
@@ -60,8 +61,12 @@ def run_calcDiff_numDiff(epsilon) :
     # Only 2 feet switch at the same time
     if nb > 0.5 :
       S = np.array([0,1,1,0])
+      u = np.random.rand(1)
+      # u = np.array([0.5])
     else : 
       S = np.array([1,0,0,1])
+      u = -np.random.rand(1)
+      # u = np.array([-0.5])
 
     actionModel.updateModel(l_feet , xref , S )
     model_diff = crocoddyl.ActionModelNumDiff(actionModel)

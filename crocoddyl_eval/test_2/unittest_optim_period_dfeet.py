@@ -12,7 +12,7 @@ import matplotlib.pylab as plt
 import quadruped_walkgen 
 import crocoddyl
 
-N_trial = 500
+N_trial = 1
 a = 1 
 b = -1
 
@@ -25,8 +25,9 @@ epsilon = 1e-3
 actionModel = quadruped_walkgen.ActionModelQuadrupedStepTime()
 actionModel.heuristicWeights =  np.zeros(8) # weight on the heuristic optim of the feet
 actionModel.stateWeights = np.zeros(12) # State weight
-actionModel.vlim = 
-# actionModel.speed_weight = 0.
+actionModel.vlim = 15/8
+actionModel.nb_nodes = 1
+actionModel.speed_weight = 1.
 actionModel.stepWeights = np.zeros(4)
 data = actionModel.createData()
 
@@ -50,8 +51,10 @@ def run_calcDiff_numDiff(epsilon) :
   for k in range(N_trial):    
 
     x = a + (b-a)*np.random.rand(21)
-    x[-1] = np.random.rand(1)[0] #dt > 0 
-    u = a + (b-a)*np.random.rand(4)
+    # x[-1] = np.random.rand(1)[0] #dt > 0 
+    x[-1] = 1
+    # u = a + (b-a)*np.random.rand(4)
+    u = np.array([2.,2.,2,2])
 
     l_feet = np.random.rand(3,4)
     xref = np.random.rand(12)
@@ -95,6 +98,12 @@ def run_calcDiff_numDiff(epsilon) :
 
     Fu +=  np.sum( abs((data.Fu - dataCpp.Fu )) >= epsilon  ) 
     Fu_err += np.sum( abs((data.Fu - dataCpp.Fu )) )  
+
+    print(data.Luu)
+    print(dataCpp.Luu)
+    print(data.Lxx[20,20])
+    print(dataCpp.Lxx[20,20])
+
 
 
 
