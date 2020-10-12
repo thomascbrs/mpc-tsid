@@ -39,6 +39,11 @@ class MPC_crocoddyl:
         else:
             self.mu = mu
 
+        # Integration model : 
+        # Implicit : V+ = V + B*U ; P+ = P + dt*V+ = P+ + dt*V + dt*B*U
+        # Explicit : V+ = V + B*U ; P+ = P + dt*V
+        self.implicit_integration = True
+
         # Gain from OSQP MPC
         self.w_x = np.sqrt(0.5)
         self.w_y = np.sqrt(0.5)
@@ -111,7 +116,13 @@ class MPC_crocoddyl:
             model.frictionWeights = self.frictionWeights     
             #shoulder term : 
             model.shoulderWeights = self.shoulderWeights
-            model.shoulder_hlim = self.shoulder_hlim            
+            model.shoulder_hlim = self.shoulder_hlim  
+
+            # Relative forces 
+            model.relative_forces = self.relative_forces
+
+            #Integration
+            model.implicit_integration = self.implicit_integration          
 
             # Add model to the list of model
             self.ListAction.append(model)
@@ -136,6 +147,12 @@ class MPC_crocoddyl:
         self.terminalModel.stateWeights = self.stateWeight
         self.terminalModel.forceWeights = np.zeros(12)
         self.terminalModel.frictionWeights = 0.
+
+        # Relative forces ; useless here since no command
+        self.terminalModel.relative_forces = self.relative_forces
+
+        # Integration
+        self.terminalModel.implicit_integration = self.implicit_integration
 
         # Shooting problem
         self.problem = crocoddyl.ShootingProblem(np.zeros(12),  self.ListAction, self.terminalModel)
@@ -263,6 +280,9 @@ class MPC_crocoddyl:
             elt.shoulder_hlim = self.shoulder_hlim
 
             elt.relative_forces = self.relative_forces
+
+            #Integration
+            elt.implicit_integration = self.implicit_integration   
         
         # Model parameters of terminal node    
         self.terminalModel.dt = self.dt 
@@ -278,7 +298,10 @@ class MPC_crocoddyl:
 
         #shoulder term : 
         self.terminalModel.shoulderWeights = self.shoulderWeights
-        self.terminalModel.shoulder_hlim = self.shoulder_hlim       
+        self.terminalModel.shoulder_hlim = self.shoulder_hlim    
+
+        #Integration
+        self.terminalModel.implicit_integration = self.implicit_integration      
 
         return 0
 
