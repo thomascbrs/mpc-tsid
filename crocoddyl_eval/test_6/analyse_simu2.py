@@ -49,7 +49,7 @@ T_gait = 0.44  # Duration of one gait period
 
 # Perturbation
 X_perturb = [0.0,0.0] # [X,Y]
-V_perturb = [0.2,0. ]
+V_perturb = [0.8,0.4 ]
 
 # Cost weights
 # Augmented state weights : 
@@ -70,15 +70,21 @@ dt_ref1 = [0.02 , 0.02 , 0.02]
 Dt_stop2 = [False,False,False]  
 dt_ref2 = [0.011 , 0.011 , 0.011]
 
+# Dt_stop1 = [True,True,True]  
+# dt_ref1 = [0.02 , 0.02 , 0.02]
+
+# Dt_stop2 = [True,True,True]  
+# dt_ref2 = [0.02 , 0.02 , 0.02]
+
 # Step feet Weights : 
-vlim = 2.5
+vlim = 1.
 speed_weight1 = 0.
-speed_weight2 = 0.
-stepWeights1 = np.full(4,0.1 )
-stepWeights2 = np.full(4,0.0 )
+speed_weight2 = 10.
+stepWeights1 = np.full(4,0.3 )
+stepWeights2 = np.full(4,0.3 )
 
 # terminal node
-term_factor = 2
+term_factor = 5
 
 # Initialisation
 #dt_init = 0.015
@@ -223,7 +229,7 @@ def run_MPC_optim_period(mpc ,  Dt_stop , dt_ref , nb_mpc) :
             if nb_mpc == 1 :
                 model.speed_weight = speed_weight1
             else : 
-                model.speed_weight = 0.
+                model.speed_weight = speed_weight2
         
 
             model.updateModel(np.reshape(l_fsteps, (3, 4), order='F') , xref[:, i+1]  ,  gait[j+1, 1:] - gait[j, 1:])
@@ -366,7 +372,7 @@ def get_results(ddp) :
 # Run optim 1 & 2 
 ddp1 = run_MPC_optim_period(mpc_planner_time , Dt_stop1 , dt_ref1 , 1 )
 ddp2 = run_MPC_optim_period(mpc_planner_time_2 , Dt_stop2 ,  dt_ref2 , 2)
-#ddp1.solve(ddp2.xs,ddp2.us,10000,isFeasible=True)
+ddp2.solve(ddp1.xs,ddp1.us,1000,isFeasible=True)
 #get results
 Xs_1 , Us_1 , lt_state_1 , lt_force_1 , Cost_1 , x_dt_change_1 , x_foot_change_1 , results_dt_1 , fsteps_1 = get_results(ddp1)
 Xs_2 , Us_2 , lt_state_2 , lt_force_2 , Cost_2 , x_dt_change_2 , x_foot_change_2 , results_dt_2 , fsteps_2 = get_results(ddp2)
@@ -391,7 +397,7 @@ for i in range(Cost_1.shape[0]) :
     plt.plot(lt_state_2 , Cost_2[i,:] , color[i] + "x--", label = legend[i] + "_2")
 
 
-plt.suptitle("cost_1 : " + str(ddp1.cost) + "  ; iter_1 : " + str(ddp1.iter) +"    /   cost_2 : " + str(ddp2.cost) + "  ; iter_2 : " + str(ddp2.iter) )
+plt.suptitle("cost_1 : " + str(ddp1.cost) + "  ; iter_1 : " + str(ddp1.iter) +"  (weight step = 0.2)  /   cost_2 : " + str(ddp2.cost) + "  ; iter_2 : " + str(ddp2.iter)  + " (weight step = 0.02)")
 
 plt.legend()
 
@@ -407,7 +413,7 @@ l_str2 = ["X_ddp", "Y_ddp", "Z_ddp", "Roll_ddp", "Pitch_ddp", "Yaw_ddp", "Vx_ddp
 index = [1, 5, 9, 2, 6, 10, 3, 7, 11, 4, 8, 12]
 plt.figure()
 
-plt.suptitle("State prediction : comparison between control cycle with dt = 0.02 fixed and dt optimisation")
+plt.suptitle("State prediction : comparison between control cycle with delta step = 0.02 --> ddp2 and 0.2 --> ddp1, dt = 0.02")
 for i in range(12):
     plt.subplot(3, 4, index[i])
            
@@ -423,7 +429,7 @@ for i in range(12):
 l_str2 = ["FL_X_ddp", "FL_Y_ddp", "FL_Z_ddp", "FR_X_ddp", "FR_Y_ddp", "FR_Z_ddp", "HL_X_ddp", "HL_Y_ddp", "HL_Z_ddp", "HR_X_ddp", "HR_Y_ddp", "HR_Z_ddp"]
 index = [1, 5, 9, 2, 6, 10, 3, 7, 11, 4, 8, 12]
 plt.figure()
-plt.suptitle("Contact forces : comparison between control cycle with dt = 0.02 fixed and dt optimisation")
+plt.suptitle("Contact forces : comparison between control cycle with delta step = 0.02 -->ddp2 and 0.2 -->ddp1, dt = 0.02")
 for i in range(12):
     plt.subplot(3, 4, index[i])    
     # for elt in x_dt_change : 
@@ -475,53 +481,105 @@ plt.figure()
 plt.suptitle("DDP OPTIM 1")
 for i in range(4) : 
     if gait[0,i+1] == 1 : 
-        plt.plot(fsteps_1[0,3*i+1] , fsteps_1[0,3*i+2] , "ko" , markerSize = 7   )
+        pl7, = plt.plot(fsteps_1[0,3*i+1] , fsteps_1[0,3*i+2] , "ko" , markerSize = 7   )
     else : 
-        plt.plot(p0[2*i] , p0[2*i+1] , "kx" , markerSize = 8   )
+        pl8, = plt.plot(p0[2*i] , p0[2*i+1] , "kx" , markerSize = 8   )
 
 # Position of the center of mass
 for elt in Xs_1 : 
-    plt.plot(Xs_1[0,:] ,Xs_1[1,:] , "gx")
+    pl6, = plt.plot(Xs_1[0,:] ,Xs_1[1,:] , "gx")
+
+# Centre of pressure
+for j in range(len(ddp1.us)) : 
+    if ddp1.us[j].size == 12 : 
+        fz = np.array([ddp1.us[j][i] for i in range(len(ddp1.us[4])) if (i+1)%3 == 0 ])
+        dx = np.array([ddp1.xs[j][12 +i] for i in range(8) if i%2 == 0])
+        dy = np.array([ddp1.xs[j][12 +i] for i in range(8) if i%2 == 1])
+        if j == 7 :
+            pl5, = plt.plot(np.sum(dx*fz)/np.linalg.norm(fz) , np.sum(dy*fz)/np.linalg.norm(fz) , "mx" , markerSize = int(20/np.sqrt(j)) )
+        else : 
+            plt.plot(np.sum(dx*fz)/np.sum(fz) , np.sum(dy*fz)/np.sum(fz) , "mx" , markerSize = int(20/np.sqrt(j)) )
 
 
 for i in range(4) : 
     for k in range(1,index) : 
         if fsteps_1[k,3*i+1] != 0. and gait[k,i+1] !=0 and gait[k-1,i+1] == 0  : 
-            if i == 0 :
-                plt.plot(fsteps_1[k,3*i+1] , fsteps_1[k,3*i+2] , "bo" , markerSize = int(20/np.sqrt(k)) ,  markerfacecolor='none'  )
-            if i == 1 :
-                plt.plot(fsteps_1[k,3*i+1] , fsteps_1[k,3*i+2] , "ro" , markerSize = int(20/np.sqrt(k)) ,  markerfacecolor='none' )
-            if i == 2 :
-                plt.plot(fsteps_1[k,3*i+1] , fsteps_1[k,3*i+2] , "ko" , markerSize = int(20/np.sqrt(k)) ,  markerfacecolor='none')
-            if i == 3 :
-                plt.plot(fsteps_1[k,3*i+1] , fsteps_1[k,3*i+2] , "go" , markerSize = int(20/np.sqrt(k)) ,  markerfacecolor='none')
+            if k >= 0 :
+                if i == 0 :
+                    pl1, = plt.plot(fsteps_1[k,3*i+1] , fsteps_1[k,3*i+2] , "bo" , markerSize = int(20/np.sqrt(k)) ,  markerfacecolor='none'  )
+                if i == 1 :
+                    pl2, = plt.plot(fsteps_1[k,3*i+1] , fsteps_1[k,3*i+2] , "ro" , markerSize = int(20/np.sqrt(k)) ,  markerfacecolor='none' )
+                if i == 2 :
+                    pl3, = plt.plot(fsteps_1[k,3*i+1] , fsteps_1[k,3*i+2] , "ko" , markerSize = int(20/np.sqrt(k)) ,  markerfacecolor='none')
+                if i == 3 :
+                    pl4, = plt.plot(fsteps_1[k,3*i+1] , fsteps_1[k,3*i+2] , "go" , markerSize = int(20/np.sqrt(k)) ,  markerfacecolor='none')
+            else : 
+                if i == 0 :
+                    plt.plot(fsteps_1[k,3*i+1] , fsteps_1[k,3*i+2] , "bo" , markerSize = int(20/np.sqrt(k)) ,  markerfacecolor='none'  )
+                if i == 1 :
+                    plt.plot(fsteps_1[k,3*i+1] , fsteps_1[k,3*i+2] , "ro" , markerSize = int(20/np.sqrt(k)) ,  markerfacecolor='none' )
+                if i == 2 :
+                    plt.plot(fsteps_1[k,3*i+1] , fsteps_1[k,3*i+2] , "ko" , markerSize = int(20/np.sqrt(k)) ,  markerfacecolor='none')
+                if i == 3 :
+                    plt.plot(fsteps_1[k,3*i+1] , fsteps_1[k,3*i+2] , "go" , markerSize = int(20/np.sqrt(k)) ,  markerfacecolor='none')
 
+plt.legend([pl1,pl2,pl3,pl4,pl5,pl6, pl7 , pl8] , ["FL" , "FR" , "HL" , "HR" ,"CoP" , "CoM" , "Initial contact" , "Pos shoulder"])
+plt.suptitle("Foot position, cost ||u||^2 : " + str(stepWeights1[0]) + ";  disturbance : [Vx,Vy] = " + str(V_perturb)  )
+plt.xlabel("x")
+plt.ylabel("y")
+###################################################
 
 plt.figure()
 for i in range(4) : 
     if gait[0,i+1] == 1 : 
-        plt.plot(fsteps_2[0,3*i+1] , fsteps_2[0,3*i+2] , "ko" , markerSize = 7   )
+        pl7, = plt.plot(fsteps_2[0,3*i+1] , fsteps_2[0,3*i+2] , "ko" , markerSize = 7   )
     else : 
-        plt.plot(p0[2*i] , p0[2*i+1] , "kx" , markerSize = 8   )
+        pl8, = plt.plot(p0[2*i] , p0[2*i+1] , "kx" , markerSize = 8   )
 
 # Position of the center of mass
 
 plt.suptitle("DDP OPTIM 2")
 for elt in Xs_2 : 
-    plt.plot(Xs_2[0,:] ,Xs_2[1,:] , "gx")
+    pl6, = plt.plot(Xs_2[0,:] ,Xs_2[1,:] , "gx")
 
 
 for i in range(4) : 
     for k in range(1,index) : 
         if fsteps_2[k,3*i+1] != 0. and gait[k,i+1] !=0 and gait[k-1,i+1] == 0  : 
-            if i == 0 :
-                plt.plot(fsteps_2[k,3*i+1] , fsteps_2[k,3*i+2] , "bo" , markerSize = int(20/np.sqrt(k)) ,  markerfacecolor='none'  )
-            if i == 1 :
-                plt.plot(fsteps_2[k,3*i+1] , fsteps_2[k,3*i+2] , "ro" , markerSize = int(20/np.sqrt(k)) ,  markerfacecolor='none' )
-            if i == 2 :
-                plt.plot(fsteps_2[k,3*i+1] , fsteps_2[k,3*i+2] , "ko" , markerSize = int(20/np.sqrt(k)) ,  markerfacecolor='none')
-            if i == 3 :
-                plt.plot(fsteps_2[k,3*i+1] , fsteps_2[k,3*i+2] , "go" , markerSize = int(20/np.sqrt(k)) ,  markerfacecolor='none')
+            if k >= 0 :
+                if i == 0 :
+                    pl1, = plt.plot(fsteps_2[k,3*i+1] , fsteps_2[k,3*i+2] , "bo" , markerSize = int(20/np.sqrt(k)) ,  markerfacecolor='none'  )
+                if i == 1 :
+                    pl2, = plt.plot(fsteps_2[k,3*i+1] , fsteps_2[k,3*i+2] , "ro" , markerSize = int(20/np.sqrt(k)) ,  markerfacecolor='none' )
+                if i == 2 :
+                    pl3, = plt.plot(fsteps_2[k,3*i+1] , fsteps_2[k,3*i+2] , "ko" , markerSize = int(20/np.sqrt(k)) ,  markerfacecolor='none')
+                if i == 3 :
+                    pl4, = plt.plot(fsteps_2[k,3*i+1] , fsteps_2[k,3*i+2] , "go" , markerSize = int(20/np.sqrt(k)) ,  markerfacecolor='none')
+            else : 
+                if i == 0 :
+                    plt.plot(fsteps_2[k,3*i+1] , fsteps_2[k,3*i+2] , "bo" , markerSize = int(20/np.sqrt(k)) ,  markerfacecolor='none'  )
+                if i == 1 :
+                    plt.plot(fsteps_2[k,3*i+1] , fsteps_2[k,3*i+2] , "ro" , markerSize = int(20/np.sqrt(k)) ,  markerfacecolor='none' )
+                if i == 2 :
+                    plt.plot(fsteps_2[k,3*i+1] , fsteps_2[k,3*i+2] , "ko" , markerSize = int(20/np.sqrt(k)) ,  markerfacecolor='none')
+                if i == 3 :
+                    plt.plot(fsteps_2[k,3*i+1] , fsteps_2[k,3*i+2] , "go" , markerSize = int(20/np.sqrt(k)) ,  markerfacecolor='none')
+
+# Centre of pressure
+for j in range(len(ddp2.us)) : 
+    if ddp2.us[j].size == 12 : 
+        fz = np.array([ddp2.us[j][i] for i in range(len(ddp2.us[4])) if (i+1)%3 == 0 ])
+        dx = np.array([ddp2.xs[j][12 +i] for i in range(8) if i%2 == 0])
+        dy = np.array([ddp2.xs[j][12 +i] for i in range(8) if i%2 == 1])
+        if j == 7 :
+            pl5, = plt.plot(np.sum(dx*fz)/np.linalg.norm(fz) , np.sum(dy*fz)/np.linalg.norm(fz) , "mx" , markerSize = int(20/np.sqrt(j)) )
+        else : 
+            plt.plot(np.sum(dx*fz)/np.sum(fz) , np.sum(dy*fz)/np.sum(fz) , "mx" , markerSize = int(20/np.sqrt(j)) )
+
+plt.legend([pl1,pl2,pl3,pl4,pl5,pl6, pl7 , pl8] , ["FL" , "FR" , "HL" , "HR" ,"CoP" , "CoM" , "Initial contact" , "Pos shoulder"])
+plt.suptitle("Foot position, cost ||u||^2 : " + str(stepWeights2[0]) + "    ;  disturbance : [Vx,Vy] = " + str(V_perturb)  )
+plt.xlabel("x")
+plt.ylabel("y")
 
 
 print("\n")
