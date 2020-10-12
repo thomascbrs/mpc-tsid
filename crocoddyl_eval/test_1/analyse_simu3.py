@@ -66,6 +66,8 @@ mpc_wrapper_ddp_1 = MPC_Wrapper.MPC_Wrapper(False, dt_mpc, fstep_planner.n_steps
                                         k_mpc, fstep_planner.T_gait, enable_multiprocessing)
 
 mpc_wrapper_ddp_1.mpc.max_iteration = 10 # The solver is not warm started here
+mpc_wrapper_ddp_1.relative_forces = True
+mpc_wrapper_ddp_1.mpc.updateActionModel() #udpate
 mpc_wrapper_ddp_1.solve(1,fstep_planner)
 
 ddp1 = mpc_wrapper_ddp_1.mpc.ddp
@@ -79,10 +81,8 @@ mpc_wrapper_ddp_2 = MPC_Wrapper.MPC_Wrapper(False, dt_mpc, fstep_planner.n_steps
                                         k_mpc, fstep_planner.T_gait, enable_multiprocessing)
 
 mpc_wrapper_ddp_2.mpc.max_iteration = 10 # The solver is not warm started here
-
-# Adjust the gain on the norm of the forces
-mpc_wrapper_ddp_2.mpc.forceWeights = np.array(12*[0.01])
-mpc_wrapper_ddp_2.mpc.relative_forces = True
+mpc_wrapper_ddp_2.implicit_integration = False
+mpc_wrapper_ddp_2.relative_forces = True
 mpc_wrapper_ddp_2.mpc.updateActionModel() #udpate
 mpc_wrapper_ddp_2.solve(1,fstep_planner)
 
