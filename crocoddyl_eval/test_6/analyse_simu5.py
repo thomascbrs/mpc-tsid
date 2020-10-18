@@ -37,281 +37,51 @@ xref = np.load(pathIn + folder_name + "xref.npy" , allow_pickle=True )
 # Iteration 
 ####################
 
-iteration = 1
-dt_mpc = 0.02  # Time step of the MPC
+iteration = 120
+dt_mpc = 0.01  # Time step of the MPC
 k_mpc = int(dt_mpc / dt)  # dt is dt_tsid, defined in the TSID controller script
 n_periods = 1  # Number of periods in the prediction horizon
-T_gait = 0.44  # Duration of one gait period
-
-###################
-# Parameters
-###################
-
-# Perturbation
-X_perturb = [0.0,0.0] # [X,Y]
-V_perturb = [0.0,0.6 ]
-
-# Cost weights
-# Augmented state weights : 
-dt_weight_bound = 0.          # (dt_min - dt)^+ ; (dt-dt_max)^+ for augmented
-# heuristicWeights = np.array([0.,0.,  1.,1.,   0.,0., 0.,0.])
-# heuristicWeights2 = np.array([0.,0.,  1.,1.,   0.,0., 0.,0.])
-heuristicWeights = np.full(8,0.)
-heuristicWeights2 = np.full(8,0.)
-lastPositionWeights = np.zeros(8)
-forceWeights = np.array(12*[0.01])     # ||u||^2
-relative_forces = True                 # ||fz-mg/nb_contact||^2
-shoulderWeights = 0
-
-# Step DT Weights : 
-dt_weight_cmd = 10000. # Weight on ||U-dt_ref|| --> Fix dt value
-dt_ref = 0.02
-dt_weight_bound_cmd = 10000.    # (dt_min - dt)^+ ; (dt-dt_max)^+
-
-Dt_stop1 = [False,False,False]  
-dt_ref1 = [0.02 , 0.02 , 0.02]
-
-Dt_stop2 = [False,False,False]  
-dt_ref2 = [0.011 , 0.011 , 0.011]
-
-# Dt_stop1 = [True,True,True]  
-# dt_ref1 = [0.02 , 0.02 , 0.02]
-
-# Dt_stop2 = [True,True,True]  
-# dt_ref2 = [0.02 , 0.02 , 0.02]
-
-# Step feet Weights : 
-vlim = 1.
-speed_weight1 = 0.
-speed_weight2 = 10.
-# stepWeights1 = np.array([0.2,0.2,2,2])
-# stepWeights2 = np.array([0.2,0.2,0.002,0.002])
-stepWeights1 = np.full(4,0.1)
-stepWeights2 = np.full(4,0.15)
-
-# shoulderPosition1 = np.array([ 0.1946,0.15005, 0.3,-0.2, -0.1946,   0.15005 ,-0.1946,  -0.15005])
-# shoulderPosition2 = shoulderPosition1
-shoulderPosition1 = np.array([ 0.1946,0.15005, 0.1946,-0.1505, -0.1946,   0.15005 ,-0.1946,  -0.15005])
-shoulderPosition2 = shoulderPosition1
-
-
-# terminal node
-term_factor = 2
-
-# Initialisation
-#dt_init = 0.015
-dt_init = 0.05
-max_iter = 100
-
-#################################################################################################################
-
-
-#################################
-# Update intern MPC parameters
-#################################
+T_gait = 0.28  # Duration of one gait period
 
 # MPC optim period 1
 mpc_planner_time = MPC_crocoddyl_planner_time(dt = dt_mpc , T_mpc = T_gait, n_periods = n_periods , min_fz = 1)
+mpc_planner_time.term_factor = 5
+mpc_planner_time.vlim = 1.5
+mpc_planner_time.speed_weight2 = 1.
 
-# Augmented state weights 1 : 
-mpc_planner_time.dt_weight_bound = dt_weight_bound
-mpc_planner_time.vlim = vlim
-mpc_planner_time.heuristicWeights = heuristicWeights
-mpc_planner_time.lastPositionWeights = lastPositionWeights
-mpc_planner_time.forceWeights = forceWeights
-mpc_planner_time.relative_forces = relative_forces
-mpc_planner_time.shoulderWeights = shoulderWeights
+# Weight on the shoulder term : 
+mpc_planner_time.shoulderWeights = 0.1
+mpc_planner_time.shoulder_hlim = 0.21 
 
-# Step DT Weights 1 : 
-mpc_planner_time.dt_weight_cmd = dt_weight_cmd
-mpc_planner_time.dt_ref = dt_ref
-mpc_planner_time.dt_weight_bound_cmd = dt_weight_bound_cmd
-
-# Step feet Weights 1 : 
-mpc_planner_time.speed_weight = speed_weight1
-mpc_planner_time.stepWeights = stepWeights1
-# mpc_planner_time.shoulderPosition =  [ 0.1946,0.15005, 0.1946,-0.15005, -0.1946,   0.15005 ,-0.1946,  -0.15005]
-
-###################
-# MPC optim period 2
-mpc_planner_time_2 = MPC_crocoddyl_planner_time(dt = dt_mpc , T_mpc = T_gait , n_periods = n_periods , min_fz = 1)
-
+# Cost weights
 # Augmented state weights : 
-mpc_planner_time_2.dt_weight_bound = dt_weight_bound
-mpc_planner_time_2.vlim = vlim
-mpc_planner_time_2.heuristicWeights = heuristicWeights2
-mpc_planner_time_2.lastPositionWeights = lastPositionWeights
-mpc_planner_time_2.forceWeights = forceWeights
-mpc_planner_time_2.relative_forces = relative_forces
-mpc_planner_time_2.shoulderWeights = shoulderWeights
+mpc_planner_time.dt_weight_bound = 0.  
+mpc_planner_time.forceWeights = np.array(12*[0.01])     # ||u||^2
+mpc_planner_time.relative_forces = True                 # ||fz-mg/nb_contact||^2
 
 # Step DT Weights : 
-mpc_planner_time_2.dt_weight_cmd = dt_weight_cmd
-mpc_planner_time_2.dt_ref = dt_ref
-mpc_planner_time_2.dt_weight_bound_cmd = dt_weight_bound_cmd
-
-# Step feet Weights : 
-mpc_planner_time_2.speed_weight = speed_weight2
-mpc_planner_time_2.stepWeights = stepWeights2
-# mpc_planner_time_2.shoulderPosition[2] = mpc_planner_time_2.shoulderPosition[2] +  0.2
-# mpc_planner_time_2.shoulderPosition[3] = mpc_planner_time_2.shoulderPosition[3] + 0.2
-# shoulderPosition2 = np.array([ 0.1946,0.15005, 0.3,-0.3, -0.1946,   0.15005 ,-0.1946,  -0.15005])
-
-#################################
-# Create Gait matrix
-#################################
-
-gait = np.zeros((20,5))
-gait[0,:] = np.array([2,1,0,0,1])
-gait[1,:] = np.array([1,1,1,1,1])
-gait[2,:] = np.array([10,0,1,1,0])
-gait[3,:] = np.array([1,1,1,1,1])
-gait[4,:] = np.array([10,1,0,0,1])
-gait[5,:] = np.array([1,1,1,1,1])
+mpc_planner_time.dt_weight_cmd = 10000. # Weight on ||U-dt_ref|| --> Fix dt value
+mpc_planner_time.dt_ref = 0.02
+mpc_planner_time.dt_weight_bound_cmd = 10000.    # (dt_min - dt)^+ ; (dt-dt_max)^+
+mpc_planner_time.stepWeights = np.array([0.1,0.3,0.1,0.3])   
 
 
+# mpc_planner_time.solve(k, fstep_planner.xref , interface.l_feet , interface.oMl)
+for i in range(iteration) : 
+    if i > 0:            
+        mpc_planner_time.roll()         
+    else : 
+        # Create gait matrix
+        mpc_planner_time.create_walking_trot()
 
-n_nodes = np.int(T_gait/dt_mpc*n_periods +  1 + gait[0,0])
-
-# Update of the list model
-xref = np.zeros((12,n_nodes + 1))
-xref[2,:] = 0.2027
-
-l_feet = l_feet_[:,:,0] 
-
-# On swing phase before --> initialised below shoulder
 p0 = np.zeros(8)
-p_shoulder = [ 0.1946,0.15005, 0.1946,-0.15005, -0.1946,   0.15005 ,-0.1946,  -0.15005]
-p0 = np.repeat(np.array([1,1,1,1])-gait[0,1:],2)*p_shoulder   
-# On the ground before -->  initialised with the current feet position
-p0 +=  np.repeat(gait[0,1:],2)*l_feet[0:2,:].reshape(8, order = 'F')
+for k in range(4) : 
+    p0[2*k] = l_feet_[:,:,i][0,k]
+    p0[2*k+1] = l_feet_[:,:,i][1,k]
 
+xref[6:9,0,i] = np.array([1.5,1.5,0.0])
 
-####################################################
-# DDP PERIOD OPTIMISATION                          #
-####################################################
-
-def run_MPC_optim_period(mpc ,  Dt_stop , dt_ref , nb_mpc) : 
-
-    # Perturbation 
-    xref[6,0] = V_perturb[0]
-    xref[7,0] = V_perturb[1]
-    xref[0,0] = X_perturb[0]
-    xref[1,0] = X_perturb[1]
-
-    j = 0
-    k_cum = 0
-    ListAction = []
-
-    # WARM START
-    l_fsteps = np.zeros((3,4))  
-    x1 = np.zeros(21)
-    x1[2] = 0.2027
-    x1[-1] = dt_init
-    u1 = np.array([0.1,0.1,8,0.1,0.1,8,0.1,0.1,8,0.1,0.1,8])
-    x_init = []
-    u_init = []
-    # Iterate over all phases of the gait
-    # The first column of xref correspond to the current state 
-    while (gait[j, 0] != 0):
-        for i in range(k_cum, k_cum+np.int(gait[j, 0])):
-
-            if np.sum(gait[j, 1:]) == 2 and i == 0  :  
-                modelTime = quadruped_walkgen.ActionModelQuadrupedTime()
-                modelTime.updateModel(np.reshape(l_fsteps, (3, 4), order='F') , xref[:, i+1]  , gait[j, 1:]) 
-                                
-                # Update intern parameters
-                mpc.update_model_step_time(modelTime , True)
-                modelTime.dt_weight_cmd = mpc.dt_weight_cmd*Dt_stop[0]
-                modelTime.dt_ref = dt_ref[0]
-                ListAction.append(modelTime)   
-                x_init.append(x1)
-                u_init.append(np.array([dt_init]))
-
-            
-
-            model = quadruped_walkgen.ActionModelQuadrupedAugmentedTime()
-            mpc.update_model_augmented(model ,True)
-
-            model.updateModel(np.reshape(l_fsteps, (3, 4), order='F') , xref[:, i+1]  , gait[j, 1:])
-            if nb_mpc == 2 : 
-                model.shoulderPosition = shoulderPosition2
-            else : 
-                model.shoulderPosition = shoulderPosition1
-            # Update intern parameters
-            ListAction.append(model)
-
-            x_init.append(x1)
-            u_init.append(np.repeat(gait[j,1:] , 3)*u1)
-        
-        if np.sum(gait[j+1, 1:]) == 4 : # No optimisation on the first line     
-        
-            model = quadruped_walkgen.ActionModelQuadrupedStepTime()
-            mpc.update_model_step_feet(model , True)
-
-            if nb_mpc == 1 :
-                model.speed_weight = speed_weight1
-            else : 
-                model.speed_weight = speed_weight2
-        
-
-            model.updateModel(np.reshape(l_fsteps, (3, 4), order='F') , xref[:, i+1]  ,  gait[j+1, 1:] - gait[j, 1:])
-            model.nb_nodes = gait[j,0]
-            # Update intern parameters
-            ListAction.append(model)
-            x_init.append(x1)
-            u_init.append(np.zeros(4))
-                
-        if np.sum(gait[j+1, 1:]) == 2 and j >= 1 :    
-
-            modelTime = quadruped_walkgen.ActionModelQuadrupedTime()
-            
-                
-            modelTime.updateModel(np.reshape(l_fsteps, (3, 4), order='F') , xref[:, i+1]  , gait[j, 1:]) 
-            
-            # Update intern parameters
-            mpc.update_model_step_time(modelTime , True)
-            if  j== 1 :
-                modelTime.dt_weight_cmd = mpc.dt_weight_cmd*Dt_stop[1]
-                modelTime.dt_ref = dt_ref[1]
-            if  j== 3 :
-                modelTime.dt_weight_cmd = mpc.dt_weight_cmd*Dt_stop[2]
-                modelTime.dt_ref = dt_ref[2]
-            ListAction.append(modelTime)   
-            x_init.append(x1)
-            u_init.append(np.array([dt_init]))
-
-        k_cum += np.int(gait[j, 0])
-        j += 1
-
-
-    # Model parameters of terminal node  
-    terminalModel = quadruped_walkgen.ActionModelQuadrupedAugmentedTime()
-    terminalModel.updateModel(np.reshape(l_fsteps, (3, 4), order='F') , xref[:, -1]  , gait[j-1, 1:]) 
-    mpc.update_model_augmented(terminalModel , True)
-    x_init.append(np.zeros(21))
-    # Weights vectors of terminal node
-    terminalModel.forceWeights = np.zeros(12)
-    terminalModel.frictionWeights = 0.
-    terminalModel.heuristicWeights = np.full(8,0.0)
-    terminalModel.lastPositionWeights =  np.full(8,0.0)
-    terminalModel.stateWeights = term_factor*terminalModel.stateWeights 
-
-
-    # Shooting problem
-    problem = crocoddyl.ShootingProblem(np.zeros(21),  ListAction, terminalModel)
-    problem.x0 = np.concatenate([xref[:,0] , p0 , [dt_init]   ])
-    ddp = crocoddyl.SolverDDP(problem)
-    ddp.setCallbacks([crocoddyl.CallbackVerbose() ])
-    ddp.solve(x_init,u_init,max_iter)
-
-    return ddp
-
-
-################
-# Get results  #
-################
-
+#################################################################################################################
 def get_results(ddp) :
 
     # Forces
@@ -390,14 +160,32 @@ def get_results(ddp) :
 
     return Xs , Us , lt_state , lt_force , Cost , x_dt_change , x_foot_change , reults_dt , fsteps
 
-###############################################################################################################################
+#################################################
 
-# Run optim 1 & 2 
-ddp1 = run_MPC_optim_period(mpc_planner_time , Dt_stop1 , dt_ref1 , 1 )
-ddp2 = run_MPC_optim_period(mpc_planner_time_2 , Dt_stop2 ,  dt_ref2 , 2)
-ddp2.solve(ddp1.xs,ddp1.us,100,isFeasible=True)
-#get results
+#################################
+# Update intern MPC parameters
+#################################
+
+mpc_planner_time.updateProblem( iteration , xref[:,:,iteration] , l_feet_[:,:,iteration] )
+# Solve problem
+mpc_planner_time.ddp.solve(mpc_planner_time.x_init,mpc_planner_time.u_init, 50)  
+
+
+ddp1 = mpc_planner_time.ddp
+gait = mpc_planner_time.gait
+
 Xs_1 , Us_1 , lt_state_1 , lt_force_1 , Cost_1 , x_dt_change_1 , x_foot_change_1 , results_dt_1 , fsteps_1 = get_results(ddp1)
+
+for i in range(len(mpc_planner_time.ddp.problem.runningModels)) : 
+    if mpc_planner_time.ddp.problem.runningModels[i].nu == 4 : 
+        # mpc_planner_time.ddp.problem.runningModels[i].dt_weight_cmd = 0.  
+        mpc_planner_time.ddp.problem.runningModels[i].speed_weight = mpc_planner_time.speed_weight2
+    if mpc_planner_time.ddp.problem.runningModels[i].nu == 1 :
+        mpc_planner_time.ddp.problem.runningModels[i].dt_weight_cmd = 0
+
+mpc_planner_time.ddp.solve(mpc_planner_time.ddp.xs,mpc_planner_time.ddp.us,100, isFeasible=True) 
+
+ddp2 = mpc_planner_time.ddp
 Xs_2 , Us_2 , lt_state_2 , lt_force_2 , Cost_2 , x_dt_change_2 , x_foot_change_2 , results_dt_2 , fsteps_2 = get_results(ddp2)
 
 #############
@@ -420,7 +208,7 @@ for i in range(Cost_1.shape[0]) :
     plt.plot(lt_state_2 , Cost_2[i,:] , color[i] + "x--", label = legend[i] + "_2")
 
 
-plt.suptitle("cost_1 : " + str(ddp1.cost) + "  ; iter_1 : " + str(ddp1.iter) +"  (weight step = 0.2)  /   cost_2 : " + str(ddp2.cost) + "  ; iter_2 : " + str(ddp2.iter)  + " (weight step = 0.02)")
+plt.suptitle("cost_1 : " + str(ddp1.cost) + "  ; iter_1 : " + str(ddp1.iter) )
 
 plt.legend()
 
@@ -518,10 +306,10 @@ for j in range(len(ddp1.us)) :
         fz = np.array([ddp1.us[j][i] for i in range(len(ddp1.us[4])) if (i+1)%3 == 0 ])
         dx = np.array([ddp1.xs[j][12 +i] for i in range(8) if i%2 == 0])
         dy = np.array([ddp1.xs[j][12 +i] for i in range(8) if i%2 == 1])
-        if j == 7 :
+        if j >= 7 :
             pl5, = plt.plot(np.sum(dx*fz)/np.linalg.norm(fz) , np.sum(dy*fz)/np.linalg.norm(fz) , "mx" , markerSize = int(20/np.sqrt(j)) )
         else : 
-            plt.plot(np.sum(dx*fz)/np.sum(fz) , np.sum(dy*fz)/np.sum(fz) , "mx" , markerSize = int(20/np.sqrt(j)) )
+            plt.plot(np.sum(dx*fz)/np.sum(fz) , np.sum(dy*fz)/np.sum(fz) , "mx" , markerSize = int(20/np.sqrt(j+1)) )
 
 
 for i in range(4) : 
@@ -547,7 +335,7 @@ for i in range(4) :
                     plt.plot(fsteps_1[k,3*i+1] , fsteps_1[k,3*i+2] , "go" , markerSize = int(20/np.sqrt(k)) ,  markerfacecolor='none')
 
 plt.legend([pl1,pl2,pl3,pl4,pl5,pl6, pl7 , pl8] , ["FL" , "FR" , "HL" , "HR" ,"CoP" , "CoM" , "Initial contact" , "Pos shoulder"])
-plt.suptitle("DDP1 : Foot position, cost ||u||^2 : " + str(stepWeights1[0]) + ";  disturbance : [Vx,Vy] = " + str(V_perturb)  )
+plt.suptitle("DDP1 : Foot position, cost ||u||^2 : ")
 plt.xlabel("x")
 plt.ylabel("y")
 ###################################################
@@ -597,10 +385,10 @@ for j in range(len(ddp2.us)) :
         if j == 7 :
             pl5, = plt.plot(np.sum(dx*fz)/np.linalg.norm(fz) , np.sum(dy*fz)/np.linalg.norm(fz) , "mx" , markerSize = int(20/np.sqrt(j)) )
         else : 
-            plt.plot(np.sum(dx*fz)/np.sum(fz) , np.sum(dy*fz)/np.sum(fz) , "mx" , markerSize = int(20/np.sqrt(j)) )
+            plt.plot(np.sum(dx*fz)/np.sum(fz) , np.sum(dy*fz)/np.sum(fz) , "mx" , markerSize = int(20/np.sqrt(j+1)) )
 
 plt.legend([pl1,pl2,pl3,pl4,pl5,pl6, pl7 , pl8] , ["FL" , "FR" , "HL" , "HR" ,"CoP" , "CoM" , "Initial contact" , "Pos shoulder"])
-plt.suptitle("DDP2 : Foot position, cost ||u||^2 : " + str(stepWeights2[0]) + "    ;  disturbance : [Vx,Vy] = " + str(V_perturb)  )
+plt.suptitle("DDP2 : Foot position, cost ||u||^2 : "  )
 plt.xlabel("x")
 plt.ylabel("y")
 
@@ -614,17 +402,12 @@ print("Cost : [4,:] --> Speed Cost")
 print("Cost : [5,:] --> dtCmdBound")
 print("Cost : [6,:] --> dtCmdRef")
 
+dt_min_l = [ddp1.problem.runningModels[i].dt_min for i in range(len(ddp1.problem.runningModels)) if ddp1.problem.runningModels[i].nu == 1 ]
+dt_max_l = [ddp1.problem.runningModels[i].dt_max for i in range(len(ddp1.problem.runningModels)) if ddp1.problem.runningModels[i].nu == 1 ]
 print("\n")
-print("dt_min : " + str(mpc_planner_time.dt_min))
-print("dt_max : " + str(mpc_planner_time.dt_max))
+print("dt_min : " + str(dt_min_l[0]) + "  dt_max : " + str(dt_max_l[0]))
+print("dt_min : " + str(dt_min_l[1]) + "  dt_max : " + str(dt_max_l[1]))
+print("dt_min : " + str(dt_min_l[2]) + "  dt_max : " + str(dt_max_l[2]))
 print("\n")
 print("Dt 1 :" + str(results_dt_1))
 print("Dt 2 :" + str(results_dt_2))
-
-
-    
-
-# plt.show(block=True)
-
-
-

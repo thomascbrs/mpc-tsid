@@ -59,6 +59,7 @@ logger_ddp , logger_osqp = run_scenario(envID, velID, dt_mpc, k_mpc, t, n_period
 # np.save(pathIn +  "o_shoulders.npy" , logger_ddp.o_shoulders )
 
 logger_ddp.plot_state()
+logger_ddp.plot_footsteps()
 plt.show(block=True)
 
 quit()

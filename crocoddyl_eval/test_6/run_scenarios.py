@@ -17,11 +17,11 @@ import time
 envID = 0
 velID = 0
 
-dt_mpc = 0.02  # Time step of the MPC
+dt_mpc = 0.01 # Time step of the MPC
 k_mpc = int(dt_mpc / dt)  # dt is dt_tsid, defined in the TSID controller script
 t = 0.0  # Time
 n_periods = 1  # Number of periods in the prediction horizon
-T_gait = 0.48  # Duration of one gait period
+T_gait = 0.28  # Duration of one gait period
 N_SIMULATION = 10000  # number of simulated TSID time steps
 
 # Which MPC solver you want to use
@@ -38,7 +38,7 @@ pyb_feedback = True
 def run_simu(speed) : 
     desired_speed = np.zeros(6)
     desired_speed[0] = speed[0]
-    desired_speed[5] = speed[1]
+    desired_speed[1] = speed[1]
 
     return run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION, type_MPC, pyb_feedback , desired_speed)
 

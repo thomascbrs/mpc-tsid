@@ -17,6 +17,7 @@ import processing as proc
 import MPC_Wrapper
 import pybullet as pyb
 from crocoddyl_class.MPC_crocoddyl_planner import *
+from crocoddyl_class.MPC_crocoddyl_planner_time import *
 
 def run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION_, type_MPC, pyb_feedback, desired_speed):
 
@@ -38,11 +39,13 @@ def run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION
     
     N_1 = np.round(int(np.around(abs(desired_speed[0]), decimals = 1 ) * 10000 + 4000) , -3 )
 
-    # 0.4 rad.s-1 for 1s
-    N_2 = np.round(int(np.around(abs(desired_speed[5]), decimals = 1 ) * 2500 + 4000) , -3 )
+    N_2 = np.round(int(np.around(abs(desired_speed[1]), decimals = 1 ) * 10000 + 4000) , -3 )
 
-    N_SIMULATION = max(N_1 , N_2)
-    # N_SIMULATION = 1000
+    # 0.4 rad.s-1 for 1s
+    N_3 = np.round(int(np.around(abs(desired_speed[5]), decimals = 1 ) * 2500 + 4000) , -3 )
+
+    N_SIMULATION = max(N_1 , N_2 , N_3)
+    N_SIMULATION = 1500
    
 
     # Initialize the error for the simulation time
@@ -81,6 +84,8 @@ def run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION
 
     # MPC with augmented states
     mpc_planner = MPC_crocoddyl_planner(dt = dt_mpc , T_mpc = fstep_planner.T_gait , n_periods = n_periods)
+
+    mpc_planner_time = MPC_crocoddyl_planner_time(dt = dt_mpc , T_mpc = fstep_planner.T_gait, n_periods = n_periods , min_fz = 1)
                                         
     # Enable/Disable hybrid control
     enable_hybrid_control = True
@@ -142,6 +147,7 @@ def run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION
 
         # Process footstep planner
         proc.process_footsteps_planner(k, k_mpc, pyb_sim, interface, joystick, fstep_planner)
+        
 
         for i in range(4):
                 index = next((idx for idx, val in np.ndenumerate(fstep_planner.fsteps[:, 3*i+1]) if ((not (val==0)) and (not np.isnan(val)))), [-1])[0]
@@ -152,6 +158,9 @@ def run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION
 
         # Process MPC once every k_mpc iterations of TSID
         if (k % k_mpc) == 0:
+            print("------------------------")
+            print(k/k_mpc)
+
             time_mpc = time.time()
             if k == 0 :
                 proc.process_mpc(k, k_mpc, interface, joystick, fstep_planner, mpc_wrapper,
@@ -167,6 +176,8 @@ def run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION
             # start_time = time.time()
             # if type_MPC == False :
             mpc_planner.solve(k, fstep_planner.xref , interface.l_feet , interface.oMl )
+
+            mpc_planner_time.solve(k, fstep_planner.xref , interface.l_feet , interface.oMl)
             # print("Temps d execution : %s secondes ---" % (time.time() - start_time)) 
 
             #############
@@ -187,19 +198,22 @@ def run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION
 
         # Replace the fstep_invdyn by the ddp one
         if type_MPC == False : 
-            fstep_planner.fsteps_invdyn = mpc_planner.fsteps.copy()
+            # mpc_planner.fsteps[4,0] = 20
+            # print(fstep_planner.fsteps[:,0] - mpc_planner.fsteps[:,0])
+            fstep_planner.fsteps_invdyn = mpc_planner_time.fsteps.copy()
+            
 
         if k == 0:
             if type_MPC == True : 
                 f_applied = mpc_wrapper.get_latest_result()
             else : 
-                f_applied = mpc_planner.get_latest_result()
+                f_applied = mpc_planner_time.get_latest_result()
         else:
             # Output of the MPC (with delay)
             if type_MPC == True : 
                 f_applied = mpc_wrapper.get_latest_result()
             else : 
-                f_applied = mpc_planner.get_latest_result() 
+                f_applied = mpc_planner_time.get_latest_result() 
                 
 
         # Process Inverse Dynamics

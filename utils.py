@@ -295,7 +295,7 @@ class pybullet_simulator:
                                                  baseInertialFramePosition=[0, 0, 0],
                                                  baseCollisionShapeIndex=collisionShapeId,
                                                  baseVisualShapeIndex=visualShapeId,
-                                                 basePosition=[-0.6, 0.9, 0.05],
+                                                 basePosition=[0.3, 0.6, 0.05],
                                                  useMaximalCoordinates=True)
 
             self.sphereId2 = pyb.createMultiBody(baseMass=0.3,
@@ -395,8 +395,8 @@ class pybullet_simulator:
 
         if envID == 1:
             # Check if the robot is in front of the first sphere to trigger it
-            if self.flag_sphere1 and (qmes12[1, 0] >= 0.9):
-                pyb.resetBaseVelocity(self.sphereId1, linearVelocity=[3.0, 0.0, 2.0])
+            if self.flag_sphere1 and (qmes12[0, 0] >= 0.3):
+                pyb.resetBaseVelocity(self.sphereId1, linearVelocity=[0.0, -0.3, 2.0])
                 self.flag_sphere1 = False
 
             # Check if the robot is in front of the second sphere to trigger it
@@ -405,10 +405,10 @@ class pybullet_simulator:
                 self.flag_sphere2 = False
 
         # Apply perturbation
-        """if (k >= 1000) and (k <= 1200):
-            pyb.applyExternalForce(self.robotId, -1, [0.0, -0.5, 0.0], [0.0, 0.0, 0.0], pyb.LINK_FRAME)
+        if (k >= 500) and (k <= 700):
+            pyb.applyExternalForce(self.robotId, -1, [0, -17, 0.0], [0.0, 0.0, 0.0], pyb.LINK_FRAME)
         if k == 1201:
-            print("End external force")"""
+            print("End external force")
 
         # Update the PyBullet camera on the robot position to do as if it was attached to the robot
         """pyb.resetDebugVisualizerCamera(cameraDistance=0.75, cameraYaw=+50, cameraPitch=-35,

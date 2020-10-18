@@ -110,7 +110,7 @@ class controller:
 
         # For update_feet_tasks function
         self.dt = 0.0010  #  [s], time step
-        self.t1 = T_gait * 0.5 - 0.02  # [s], duration of swing phase
+        self.t1 = T_gait * 0.5 - 0.02  # [s], duration of swing phase # not used
 
         # Rotation matrix
         self.R = np.eye(3)
@@ -134,6 +134,8 @@ class controller:
         self.n_periods = n_periods
         self.h_ref = 0.235 - 0.01205385
         self.t_swing = np.zeros((4, ))  # Total duration of current swing phase for each foot
+
+        self.t_swing_variable = np.zeros((4, ))  
 
         self.contacts_order = [0, 1, 2, 3]
 
@@ -277,6 +279,9 @@ class controller:
         # Resize the solver to fit the number of variables, equality and inequality constraints
         self.solver.resize(self.invdyn.nVar, self.invdyn.nEq, self.invdyn.nIn)
 
+        # old gait 
+        self.gait_old = np.zeros((20,5))
+
     def update_feet_tasks(self, k_loop, gait, looping, interface, ftps_Ids_deb):
         """Update the 3D desired position for feet in swing phase by using a 5-th order polynomial that lead them
            to the desired position on the ground (computed by the footstep planner)
@@ -294,11 +299,27 @@ class controller:
         if len(feet) == 0:  # If no foot in swing phase
             return 0
 
+
+        if (k_loop % self.k_mpc == 0) :
+            if int(np.sum(gait[0,1:] - self.gait_old[0,1:]) ) != 0 : 
+                # not same phase
+                self.t_swing_variable = np.zeros(4)
+                for i in feet : 
+                    self.t_swing_variable[i] = gait[0,0]*self.dt*self.k_mpc
+            
+            
+            # else : 
+            #     for i in feet : 
+            #         if int(self.gait_old[0,0] - gait[0,0]) != 1 : 
+            #             self.t_swing_variable[i] += (gait[0,0] - gait_old[0,0] + 1)*self.dt*self.k_mpc
+                    
+
         t0s = []
         for i in feet:  # For each foot in swing phase get remaining duration of the swing phase
             # Index of the line containing the next stance phase
             index = next((idx for idx, val in np.ndenumerate(gait[:, 1+i]) if (((val == 1)))), [-1])[0]
-            remaining_iterations = np.cumsum(gait[:index, 0])[-1] * self.k_mpc - ((k_loop+1) % self.k_mpc)
+            # remaining_iterations = np.cumsum(gait[:index, 0])[-1] * self.k_mpc - ((k_loop+1) % self.k_mpc)
+            remaining_iterations = np.cumsum(gait[:index, 0])[-1] * self.k_mpc - ((k_loop) % self.k_mpc)
 
             # Compute total duration of current swing phase
             i_iter = 1
@@ -312,7 +333,13 @@ class controller:
                 i_iter -= 1
             self.t_swing[i] *= self.dt * self.k_mpc
 
+            
+            self.t_swing[i] = self.t_swing_variable[i]
+        
+
             t0s.append(np.round(np.max((self.t_swing[i] - remaining_iterations * self.dt - self.dt, 0.0)), decimals=3))
+
+        # print(t0s)
 
         # self.footsteps contains the target (x, y) positions for both feet in swing phase
 
@@ -464,9 +491,16 @@ class controller:
         ################
         # UPDATE TASKS #
         ################
+        #Construction of the gait matrix representing the feet in contact with the ground
+        index = next((idx for idx, val in np.ndenumerate(fsteps[:, 0]) if val==0.0), 0.0)[0]
+        gait2 = np.zeros((20,5))
+        gait2[:, 0] = fsteps[:, 0]
+        gait2[:index, 1:] = 1.0 - (np.isnan(fsteps[:index, 1::3]) | (fsteps[:index, 1::3] == 0.0))
+        # print(k_loop)
+        # print(gait - gait2)
 
         # Enable/disable contact and 3D tracking tasks depending on the state of the feet (swing or stance phase)
-        self.update_tasks(k_simu, k_loop, looping, interface, gait, ftps_Ids_deb)
+        self.update_tasks(k_simu, k_loop, looping, interface, gait2, ftps_Ids_deb )
 
         ###############
         # HQP PROBLEM #
@@ -518,6 +552,7 @@ class controller:
                 fsteps[:, 3*i+1]) if ((not (val == 0)) and (not np.isnan(val)))), [-1])[0]
             pos_tmp = interface.oMl * (np.array([fsteps[index, (1+i*3):(4+i*3)]]).transpose())
             self.footsteps[:, i] = pos_tmp[0:2]
+        
 
         return 0
 
@@ -533,7 +568,7 @@ class controller:
 
         return 0
 
-    def update_tasks(self, k_simu, k_loop, looping, interface, gait, ftps_Ids_deb):
+    def update_tasks(self, k_simu, k_loop, looping, interface, gait, ftps_Ids_deb ):
         """ Update TSID tasks (feet tracking, contacts, force tracking)
 
         Args:
@@ -545,7 +580,6 @@ class controller:
             fsteps (20x13): duration of each phase of the gait sequence (first column)
                             and desired location of footsteps for these phases (other columns)
         """
-
         # Update the foot tracking tasks
         self.update_feet_tasks(k_loop, gait, looping, interface, ftps_Ids_deb)
 
@@ -556,34 +590,67 @@ class controller:
         for i_foot in range(4):
 
             # If foot entered swing phase
-            if (k_loop % self.k_mpc == 0) and (gait[0, i_foot+1] == 0) and (gait[index-1, i_foot+1] == 1):
-                # Disable contact
-                self.invdyn.removeRigidContact(self.foot_frames[i_foot], 0.0)
-                self.contacts_order.remove(i_foot)
+            if int(np.sum(self.gait_old[0,:])) == 0 : #still 1st iteration
+                if (k_loop % self.k_mpc == 0) and (gait[0, i_foot+1] == 0) and (gait[index-1, i_foot+1] == 1):
+                    # Disable contact
+                    self.invdyn.removeRigidContact(self.foot_frames[i_foot], 0.0)
+                    self.contacts_order.remove(i_foot)
 
-                # Enable foot tracking task
-                self.invdyn.addMotionTask(self.feetTask[i_foot], self.w_foot, 1, 0.0)
+                    # Enable foot tracking task
+                    self.invdyn.addMotionTask(self.feetTask[i_foot], self.w_foot, 1, 0.0)
 
-            # If foot entered stance phase
-            if (k_loop % self.k_mpc == 0) and (gait[0, i_foot+1] == 1) and (gait[index-1, i_foot+1] == 0):
+                # If foot entered stance phase
+                if (k_loop % self.k_mpc == 0) and (gait[0, i_foot+1] == 1) and (gait[index-1, i_foot+1] == 0):
 
-                # Update the position of contacts
-                tmp = interface.o_feet[:, i_foot:(i_foot+1)].copy()
-                tmp[2, 0] = 0.0
-                self.pos_foot.translation = tmp
-                self.pos_contact[i_foot] = self.pos_foot.translation.transpose()
-                self.memory_contacts[:, i_foot] = interface.o_feet[0:2, i_foot]
-                self.feetGoal[i_foot].translation = tmp.ravel()
-                self.contacts[i_foot].setReference(self.pos_foot.copy())
-                self.goals[:, i_foot] = tmp.transpose()
+                    # Update the position of contacts
+                    tmp = interface.o_feet[:, i_foot:(i_foot+1)].copy()
+                    tmp[2, 0] = 0.0
+                    self.pos_foot.translation = tmp
+                    self.pos_contact[i_foot] = self.pos_foot.translation.transpose()
+                    self.memory_contacts[:, i_foot] = interface.o_feet[0:2, i_foot]
+                    self.feetGoal[i_foot].translation = tmp.ravel()
+                    self.contacts[i_foot].setReference(self.pos_foot.copy())
+                    self.goals[:, i_foot] = tmp.transpose()
 
-                if not ((k_loop == 0) and (k_simu < looping)):  # If it is not the first gait period
-                    # Enable contact
-                    self.invdyn.addRigidContact(self.contacts[i_foot], self.w_forceRef)
-                    self.contacts_order.append(i_foot)
+                    if not ((k_loop == 0) and (k_simu < looping)):  # If it is not the first gait period
+                        # Enable contact
+                        self.invdyn.addRigidContact(self.contacts[i_foot], self.w_forceRef)
+                        self.contacts_order.append(i_foot)
 
-                    # Disable foot tracking task
-                    self.invdyn.removeTask("foot_track_" + str(i_foot), 0.0)
+                        # Disable foot tracking task
+                        self.invdyn.removeTask("foot_track_" + str(i_foot), 0.0)
+            else : 
+                if (k_loop % self.k_mpc == 0) and (gait[0, i_foot+1] == 0) and (self.gait_old[0, i_foot+1] == 1):
+                    # Disable contact
+                    self.invdyn.removeRigidContact(self.foot_frames[i_foot], 0.0)
+                    self.contacts_order.remove(i_foot)
+
+                    # Enable foot tracking task
+                    self.invdyn.addMotionTask(self.feetTask[i_foot], self.w_foot, 1, 0.0)
+
+                # If foot entered stance phase
+                if (k_loop % self.k_mpc == 0) and (gait[0, i_foot+1] == 1) and (self.gait_old[0, i_foot+1] == 0):
+
+                    # Update the position of contacts
+                    tmp = interface.o_feet[:, i_foot:(i_foot+1)].copy()
+                    tmp[2, 0] = 0.0
+                    self.pos_foot.translation = tmp
+                    self.pos_contact[i_foot] = self.pos_foot.translation.transpose()
+                    self.memory_contacts[:, i_foot] = interface.o_feet[0:2, i_foot]
+                    self.feetGoal[i_foot].translation = tmp.ravel()
+                    self.contacts[i_foot].setReference(self.pos_foot.copy())
+                    self.goals[:, i_foot] = tmp.transpose()
+
+                    if not ((k_loop == 0) and (k_simu < looping)):  # If it is not the first gait period
+                        # Enable contact
+                        self.invdyn.addRigidContact(self.contacts[i_foot], self.w_forceRef)
+                        self.contacts_order.append(i_foot)
+
+                        # Disable foot tracking task
+                        self.invdyn.removeTask("foot_track_" + str(i_foot), 0.0)
+                        
+        if (k_loop % self.k_mpc == 0) : 
+            self.gait_old = gait
 
         return 0
 
