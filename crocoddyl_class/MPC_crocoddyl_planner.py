@@ -103,8 +103,8 @@ class MPC_crocoddyl_planner():
         self.fsteps = np.full((20, 13), 0.0)    
 
         # Weight on the shoulder term : 
-        self.shoulderWeights = 2.
-        self.shoulder_hlim = 0.225    
+        self.shoulderWeights = 0.5
+        self.shoulder_hlim = 0.215    
 
         # List of the actionModel
         self.ListAction = [] 

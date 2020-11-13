@@ -4,7 +4,7 @@ import numpy as np
 import pybullet as pyb
 import pinocchio as pin
 import os
-from matplotlib import pyplot as plt
+# from matplotlib import pyplot as plt
 from utils import getQuaternion
 
 
@@ -140,7 +140,7 @@ def process_footsteps_planner(k, k_mpc, pyb_sim, interface, joystick, fstep_plan
         # fstep_planner.gait_invdyn = fstep_planner.gait.copy()
 
         if (k != 0):
-            fstep_planner.update_fsteps(k+1, k_mpc, interface.l_feet, np.vstack((interface.lV, interface.lW)),
+            fstep_planner.update_fsteps(k, k_mpc, interface.l_feet, np.vstack((interface.lV, interface.lW)),
                                         joystick.v_ref, interface.lC[2, 0], interface.oMl, pyb_sim.ftps_Ids,
                                         joystick.reduced)
 

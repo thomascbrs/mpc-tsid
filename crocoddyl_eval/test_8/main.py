@@ -5,7 +5,6 @@ from sys import argv
 sys.path.insert(0, os.getcwd()) # adds current directory to python path
 
 import numpy as np
-import matplotlib.pylab as plt
 import utils
 import time
 
@@ -18,9 +17,12 @@ import MPC_Wrapper
 import pybullet as pyb
 import Logger
 from crocoddyl_class.MPC_crocoddyl import MPC_crocoddyl
-from crocoddyl_class.MPC_crocoddyl_2 import MPC_crocoddyl_2
+from crocoddyl_class.MPC_crocoddyl_planner import *
+from crocoddyl_class.MPC_crocoddyl_planner_time import *
 
-def run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION, type_MPC, pyb_feedback , desired_speed):
+
+
+def run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION, type_MPC, pyb_feedback , mpc_model , desired_speed):
 
     ########################################################################
     #                        Parameters definition                         #
@@ -35,10 +37,19 @@ def run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION
     N_SIMULATION = 1000  # number of time steps simulated"""
 
     N_1 = np.round(int(np.around(abs(desired_speed[0]), decimals = 1 ) * 10000 + 10000) , -3 )
-    N_2 = np.round(int(np.around(abs(desired_speed[1]), decimals = 1 ) * 10000 + 10000) , -3 )
-    N_3 = np.round(int(np.around(abs(desired_speed[5]), decimals = 1 ) * 2500 + 10000) , -3 )
-    
-    N_SIMULATION = max(N_1 , N_2,N_3)
+    N_2 = np.round(int(np.around(abs(desired_speed[5]), decimals = 1 ) * 2500 + 10000) , -3 )
+    N_3 = np.round(int(np.around(abs(desired_speed[1]), decimals = 1 ) * 10000 + 10000) , -3 )
+    N_SIMULATION = max(N_1 , N_2 , N_3)
+    N_SIMULATION = 2000
+
+
+    # to generate trajectory 
+    torques_ff = np.zeros((12, N_SIMULATION))
+    torques_pd = np.zeros((12, N_SIMULATION))
+    torques_sent = np.zeros((12, N_SIMULATION))
+
+    qtsid = np.zeros((19,N_SIMULATION))
+    vtsid = np.zeros((18, N_SIMULATION))
 
     # Initialize the error for the simulation time
     time_error = False
@@ -52,7 +63,7 @@ def run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION
     ID_deb_lines = []
 
     # Enable/Disable Gepetto viewer
-    enable_gepetto_viewer = False
+    enable_gepetto_viewer = True
 
     # Which MPC solver you want to use
     # True to have PA's MPC, to False to have Thomas's MPC
@@ -61,12 +72,14 @@ def run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION
     # Create Joystick, FootstepPlanner, Logger and Interface objects
     joystick, fstep_planner, logger_ddp, interface = utils.init_objects(
         dt, dt_mpc, N_SIMULATION, k_mpc, n_periods, T_gait, False)
-
-    # Multi simulation environment
+    
+     # Multi simulation environment
     joystick.multi_simu = True
     joystick.Vx_ref = desired_speed[0]
     joystick.Vy_ref = desired_speed[1]
     joystick.Vw_ref = desired_speed[5]
+
+    # Multi simulation environment
 
     # Create a new logger type for the second solver
     logger_osqp = Logger.Logger(N_SIMULATION, dt, dt_mpc, k_mpc, n_periods, T_gait, True)
@@ -84,35 +97,11 @@ def run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION
     
     mpc_wrapper_ddp_nl = MPC_crocoddyl( dt = dt_mpc , T_mpc = T_gait , mu = 0.9, inner = False, linearModel = False  , n_period = 1)
 
-    mpc_wrapper_ddp_2 = MPC_crocoddyl_2( dt = dt_mpc , T_mpc = T_gait , mu = 0.9, inner = False, linearModel = False  , n_period = 1 , dt_tsid = dt)
-    
-    
-    # mpc_wrapper_ddp_nl.shoulderWeights = 15
-    # mpc_wrapper_ddp_nl.forceWeights = np.array(4*[0.005,0.005,0.005]) 
-    # mpc_wrapper_ddp_nl.shoulder_hlim = 0.205
-    # mpc_wrapper_ddp_nl.stateWeight[2] = np.sqrt(10.)
-    # mpc_wrapper_ddp_nl.stateWeight[9] = np.sqrt(0.02*np.sqrt(0.11))
-    mpc_wrapper_ddp_nl.updateActionModel()
+    # MPC with augmented states
+    mpc_planner = MPC_crocoddyl_planner(dt = dt_mpc , T_mpc = fstep_planner.T_gait , n_periods = n_periods)
 
-    # if n_periods > 1 :
-    #     w_x = 0.5 # more weight on x axis
-    #     w_y = 0.4
-    #     w_z = 2.
-    #     w_roll = 0.9 # diff from MPC_crocoddyl
-    #     w_pitch = 1. # diff from MPC_crocoddyl
-    #     w_yaw = 0.11
-    #     w_vx =  1.2*np.sqrt(w_x) # more weight on vx
-    #     w_vy =  2*np.sqrt(w_y)
-    #     w_vz =  1*np.sqrt(w_z)
-    #     w_vroll =  0.05*np.sqrt(w_roll)
-    #     w_vpitch =  0.05*np.sqrt(w_pitch)
-    #     w_vyaw =  0.03*np.sqrt(w_yaw)
+    mpc_planner_time = MPC_crocoddyl_planner_time(dt = dt_mpc , T_mpc = fstep_planner.T_gait, n_periods = n_periods , min_fz = 1)
 
-    #     # Weight Vector : State 
-    #     mpc_wrapper_ddp.mpc.stateWeight = np.array([w_x,w_y,w_z,w_roll,w_pitch,w_yaw,
-    #                                 w_vx,w_vy,w_vz,w_vroll,w_vpitch,w_vyaw])
-        
-    #     mpc_wrapper_ddp.mpc.updateActionModel()
 
     # Enable/Disable hybrid control
     enable_hybrid_control = True
@@ -143,6 +132,8 @@ def run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION
     mySafetyController = Safety_controller.controller_12dof()
     myEmergencyStop = EmergencyStop_controller.controller_12dof()
 
+    import matplotlib.pylab as plt
+
     for k in range(int(N_SIMULATION)):
         time_loop = time.time()
 
@@ -161,47 +152,50 @@ def run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION
         
 
         if (k % k_mpc) == 0:
+            print(fstep_planner.xref[6,0:2])
             time_mpc = time.time()
             # Run both algorithms
-            proc.process_mpc(k, k_mpc, interface, joystick, fstep_planner, mpc_wrapper_osqp,
+            # proc.process_mpc(k, k_mpc, interface, joystick, fstep_planner, mpc_wrapper_osqp,
+            #                  dt_mpc, ID_deb_lines)
+            if mpc_model == 0 : 
+                proc.process_mpc(k, k_mpc, interface, joystick, fstep_planner, mpc_wrapper_ddp,
                              dt_mpc, ID_deb_lines)
-            proc.process_mpc(k, k_mpc, interface, joystick, fstep_planner, mpc_wrapper_ddp,
-                             dt_mpc, ID_deb_lines)
-            # print("---------------------------------------------------------------------------")
-            # print(fstep_planner.gait[0,:])
-            # print((mpc_wrapper_ddp.mpc.B_log - mpc_wrapper_osqp.mpc.B_log)[:3,:])
-            mpc_wrapper_ddp_nl.updateProblem(fstep_planner.fsteps , fstep_planner.xref )
-
-            # # Warm start : set candidate state and input vector           
-            # us_osqp = mpc_wrapper_osqp.mpc.x[mpc_wrapper_osqp.mpc.xref.shape[0]*(mpc_wrapper_osqp.mpc.xref.shape[1]-1):].reshape((mpc_wrapper_osqp.mpc.xref.shape[0],
-            #                                                                                                mpc_wrapper_osqp.mpc.xref.shape[1]-1),
-            #                                                                                                order='F')
-            # xs_osqp =  mpc_wrapper_osqp.mpc.x_robot
-            # u_init = []
-            # x_init = []
-            # x_init.append(fstep_planner.xref[:,0]) 
-            # for j in range(len(us_osqp)) : 
-            #     u_init.append(us_osqp[:,j])
-            #     x_init.append(xs_osqp[:,j])
-
-            mpc_wrapper_ddp_nl.ddp.solve([], [], 50 )
-
+            else : 
+                fstep_planner.getRefStates((k/k_mpc), fstep_planner.T_gait, interface.lC, interface.abg,
+                    interface.lV, interface.lW, joystick.v_ref, h_ref=0.2027682)
             
+            if mpc_model == 1 : 
+                mpc_wrapper_ddp_nl.updateProblem(fstep_planner.fsteps , fstep_planner.xref )
+                mpc_wrapper_ddp_nl.ddp.solve([], [], 10 )
 
+            if mpc_model == 2 : 
+                mpc_planner.solve(k, fstep_planner.xref , interface.l_feet , interface.oMl )
+            
+            if mpc_model == 3 : 
+                mpc_planner_time.solve(k, fstep_planner.xref , interface )
             
             logger_ddp.log_fstep_planner( k , fstep_planner)
            
             t_list_mpc[k] = time.time() - time_mpc            
             print( int(k/k_mpc))
-        # Process MPC once every k_mpc iterations of TSID
-        mpc_wrapper_ddp_2.updateProblem(k,fstep_planner.fsteps , fstep_planner.xref , interface.lC, interface.abg, interface.lV, interface.lW, joystick.v_ref)
-        mpc_wrapper_ddp_2.ddp.solve([],[],50)
-        if k <= 8000:
-            f_applied = mpc_wrapper_ddp_2.get_latest_result()
-        # elif (k % k_mpc) == 0:
-        else:
-            # Output of the MPC (with delay)
-            f_applied = mpc_wrapper_ddp_2.get_latest_result()
+
+
+        # Foot placement : 
+        if mpc_model == 2 : 
+            fstep_planner.fsteps_invdyn = mpc_planner.fsteps.copy()
+        if mpc_model == 3 :   
+            fstep_planner.fsteps_invdyn = mpc_planner_time.fsteps.copy()
+    
+
+        if mpc_model == 1 : 
+            f_applied = mpc_wrapper_ddp_nl.get_latest_result()
+        elif mpc_model == 2 : 
+            f_applied = mpc_planner.get_latest_result()
+        elif mpc_model == 3 : 
+            f_applied = mpc_planner_time.get_latest_result()
+        else : 
+            f_applied = mpc_wrapper_ddp.get_latest_result()
+
 
         # Process Inverse Dynamics
         time_tsid = time.time()
@@ -223,31 +217,42 @@ def run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION
             proc.process_pybullet(pyb_sim, k, envID, jointTorques)
 
         # Call logger object to log various parameters
-        logger_ddp.call_log_functions(k, pyb_sim, joystick, fstep_planner, interface, mpc_wrapper_ddp, myController,
-                                 False, pyb_sim.robotId, pyb_sim.planeId, solo)
+        # logger_ddp.call_log_functions(k, pyb_sim, joystick, fstep_planner, interface, mpc_wrapper_ddp, myController,
+        #                          False, pyb_sim.robotId, pyb_sim.planeId, solo)
         
-        if (k % k_mpc) == 0:
-            # logger_ddp.log_fstep_planner( k , fstep_planner)
-            logger_osqp.log_predicted_trajectories(k, mpc_wrapper_osqp)
+        # if (k % k_mpc) == 0:
+        #     # logger_ddp.log_fstep_planner( k , fstep_planner)
+        #     logger_osqp.log_predicted_trajectories(k, mpc_wrapper_osqp)
 
         t_list_loop[k] = time.time() - time_loop
+
+ 
+
+
+        #######
+        # Generate traj : 
+        torques_ff[:, k:(k+1)] =  np.reshape(myController.tau_ff ,(12,1))
+        torques_pd[:, k:(k+1)] = np.reshape(myController.tau_pd ,(12,1))
+        torques_sent[:, k:(k+1)] = np.reshape(myController.tau ,(12,1))
+        qtsid[:,k:(k+1)] = np.reshape(myController.qtsid ,(19,1))
+        vtsid[:,k:(k+1)] = np.reshape(myController.vtsid ,(18,1))
 
         #########################
         #   Camera
         #########################
 
-        # if (k % 20) == 0:
-        #     img = pyb.getCameraImage(width=1920, height=1080, renderer=pyb.ER_BULLET_HARDWARE_OPENGL)
+        # if (k % 2) == 0:
+        #     img = pyb.getCameraImage(width=int(1.2*1920), height=int(1.2*1080), renderer=pyb.ER_BULLET_HARDWARE_OPENGL)
         #     #if k == 0:
         #     #    newpath = r'/tmp/recording'
         #     #    if not os.path.exists(newpath):
         #     #       os.makedirs(newpath)
-        #     if (int(k/20) < 10):
-        #         plt.imsave('tmp/recording/frame_00'+str(int(k/20))+'.png', img[2])
-        #     elif int(k/20) < 100:
-        #         plt.imsave('tmp/recording/frame_0'+str(int(k/20))+'.png', img[2])
+        #     if (int(k/2) < 10):
+        #         plt.imsave('tmp/recording/frame_00'+str(int(k/2))+'.png', img[2])
+        #     elif int(k/2) < 100:
+        #         plt.imsave('tmp/recording/frame_0'+str(int(k/2))+'.png', img[2])
         #     else:
-        #         plt.imsave('tmp/recording/frame_'+str(int(k/20))+'.png', img[2])
+        #         plt.imsave('tmp/recording/frame_'+str(int(k/2))+'.png', img[2])
 
     ####################
     # END OF MAIN LOOP #
@@ -264,7 +269,7 @@ def run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION
 
     pyb.disconnect()
 
-    return logger_ddp , logger_osqp
+    return torques_ff , torques_pd , torques_sent, qtsid , vtsid
 
 
 """# Display what has been logged by the logger

@@ -1,7 +1,7 @@
 # coding: utf8
 
 import numpy as np
-from matplotlib import pyplot as plt
+# from matplotlib import pyplot as plt
 import pybullet as pyb
 import pinocchio as pin
 import scipy.stats as scipystats
@@ -65,6 +65,11 @@ class Logger:
         self.feet_pos = np.zeros((3, 4, k_max_loop))
         self.feet_vel = np.zeros((3, 4, k_max_loop))
         self.feet_acc = np.zeros((3, 4, k_max_loop))
+         # Store current and desired position, velocity and acceleration of feet over time LOCAL
+        self.lfeet_pos = np.zeros((3, 4, k_max_loop))
+        self.lfeet_vel = np.zeros((3, 4, k_max_loop))
+        self.lfeet_acc = np.zeros((3, 4, k_max_loop))
+
         self.feet_pos_target = np.zeros((3, 4, k_max_loop))
         self.feet_vel_target = np.zeros((3, 4, k_max_loop))
         self.feet_acc_target = np.zeros((3, 4, k_max_loop))
@@ -131,6 +136,9 @@ class Logger:
         self.feet_pos[:, :, k] = interface.o_feet
         self.feet_vel[:, :, k] = interface.ov_feet
         self.feet_acc[:, :, k] = interface.oa_feet
+        self.lfeet_pos[:, :, k] = interface.l_feet
+        self.lfeet_vel[:, :, k] = interface.lv_feet
+        self.lfeet_acc[:, :, k] = interface.la_feet
         self.feet_pos_target[:, :, k] = tsid_controller.goals.copy()
         self.feet_vel_target[:, :, k] = tsid_controller.vgoals.copy()
         self.feet_acc_target[:, :, k] = tsid_controller.agoals.copy()
@@ -731,7 +739,7 @@ class Logger:
 
         # Store information about the predicted evolution of the optimization vector components
         if not enable_multiprocessing and ((k % self.k_mpc) == 0):
-            self.log_predicted_trajectories(k, mpc_wrapper)
+            # self.log_predicted_trajectories(k, mpc_wrapper)
             self.log_fstep_planner(k ,fstep_planner )
 
         # Store information about one of the foot tracking task

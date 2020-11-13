@@ -5,7 +5,7 @@ from sys import argv
 sys.path.insert(0, os.getcwd()) # adds current directory to python path
 
 import numpy as np
-import matplotlib.pylab as plt
+# import matplotlib.pylab as plt
 import utils
 import time
 
@@ -45,7 +45,7 @@ def run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION
     N_3 = np.round(int(np.around(abs(desired_speed[5]), decimals = 1 ) * 2500 + 4000) , -3 )
 
     N_SIMULATION = max(N_1 , N_2 , N_3)
-    N_SIMULATION = 1500
+    # N_SIMULATION = 1500
    
 
     # Initialize the error for the simulation time
@@ -79,7 +79,7 @@ def run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION
     # Wrapper that makes the link with the solver that you want to use for the MPC
     # First argument to True to have PA's MPC, to False to have Thomas's MPC
     enable_multiprocessing = False
-    mpc_wrapper = MPC_Wrapper.MPC_Wrapper(True, dt_mpc, fstep_planner.n_steps,
+    mpc_wrapper = MPC_Wrapper.MPC_Wrapper(False, dt_mpc, fstep_planner.n_steps,
                                           k_mpc, fstep_planner.T_gait, enable_multiprocessing)
 
     # MPC with augmented states
@@ -103,6 +103,7 @@ def run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION
     o_feet_heur = np.zeros((3,4,int(N_SIMULATION/k_mpc)))
     pos_pred_local = np.zeros((3,4,int(N_SIMULATION/k_mpc)))
     pos_pred_local_heur = np.zeros((3,4,int(N_SIMULATION/k_mpc)))
+    xref = np.zeros((12, int(T_gait/dt_mpc + 1), int(N_SIMULATION/k_mpc)))
 
     ########################################################################
     #                            Gepetto viewer                            #
@@ -174,44 +175,63 @@ def run_scenario(envID, velID, dt_mpc, k_mpc, t, n_periods, T_gait, N_SIMULATION
 
             # running mpc planner in parallel (xref has been updated in process_mpc)
             # start_time = time.time()
-            # if type_MPC == False :
-            mpc_planner.solve(k, fstep_planner.xref , interface.l_feet , interface.oMl )
-
-            mpc_planner_time.solve(k, fstep_planner.xref , interface.l_feet , interface.oMl)
+            fstep_planner.xref[5,0] = interface.RPY[2]
+            if type_MPC == True :
+                mpc_planner.solve(k, fstep_planner.xref , interface.l_feet , interface.oMl )
+            else : 
+                # mpc_planner.solve(k, fstep_planner.xref , interface.l_feet , interface.oMl )
+                mpc_planner_time.solve(k, fstep_planner.xref , interface )
+                # mpc_planner_time.solve(k, fstep_planner.xref , interface.l_feet , interface.oMl )
+                # print(mpc_planner.get_latest_result())
             # print("Temps d execution : %s secondes ---" % (time.time() - start_time)) 
+
+            
+            mpc_planner_time.solve(k, fstep_planner.xref , interface )
+            
+        
+       
 
             #############
             # ddp logger
             #############
-            logger.log_fstep_planner(k,fstep_planner)
-            pred_trajectories[:,:,int(k/k_mpc)] = mpc_planner.Xs
-            pred_forces[:,:,int(k/k_mpc)] = mpc_planner.Us
-            fsteps[:,:,int(k/k_mpc)] = mpc_planner.fsteps.copy()
-            gait_[:,:,int(k/k_mpc)] = mpc_planner.gait
+            # logger.log_fstep_planner(k,fstep_planner)
+            # pred_trajectories[:,:,int(k/k_mpc)] = mpc_planner.Xs
+            # pred_forces[:,:,int(k/k_mpc)] = mpc_planner.Us
+            # fsteps[:,:,int(k/k_mpc)] = mpc_planner.fsteps.copy()
+            if type_MPC :
+                gait_[:,:,int(k/k_mpc)] = mpc_planner.gait
+            else : 
+                gait_[:,:,int(k/k_mpc)] = mpc_planner_time.gait
             l_feet_[:,:,int(k/k_mpc)] = interface.l_feet
-            pos_pred_local[:,:,int(k/k_mpc)] = mpc_planner.l_fsteps
-            for i in range(4):
-                index = next((idx for idx, val in np.ndenumerate(mpc_planner.fsteps[:, 3*i+1]) if ((not (val==0)) and (not np.isnan(val)))), [-1])[0]
-                pos_tmp = np.reshape(np.array(interface.oMl * (np.array([mpc_planner.fsteps[index, (1+i*3):(4+i*3)]]).transpose())) , (3,1) )
-                o_feet_[:2, i , int(k/k_mpc)] = pos_tmp[0:2, 0]
+            xref[:, :, int(k/k_mpc)] = fstep_planner.xref
+            # pos_pred_local[:,:,int(k/k_mpc)] = mpc_planner.l_fsteps
+            # for i in range(4):
+            #     index = next((idx for idx, val in np.ndenumerate(mpc_planner.fsteps[:, 3*i+1]) if ((not (val==0)) and (not np.isnan(val)))), [-1])[0]
+            #     pos_tmp = np.reshape(np.array(interface.oMl * (np.array([mpc_planner.fsteps[index, (1+i*3):(4+i*3)]]).transpose())) , (3,1) )
+            #     o_feet_[:2, i , int(k/k_mpc)] = pos_tmp[0:2, 0]
+       
+            if k/k_mpc == 300 : 
+                return gait_ , logger 
             
 
         # Replace the fstep_invdyn by the ddp one
-        if type_MPC == False : 
+        if type_MPC == True : 
             # mpc_planner.fsteps[4,0] = 20
             # print(fstep_planner.fsteps[:,0] - mpc_planner.fsteps[:,0])
+            fstep_planner.fsteps_invdyn = mpc_planner.fsteps.copy()
+        else : 
             fstep_planner.fsteps_invdyn = mpc_planner_time.fsteps.copy()
             
 
         if k == 0:
             if type_MPC == True : 
-                f_applied = mpc_wrapper.get_latest_result()
+                f_applied = mpc_planner.get_latest_result()
             else : 
                 f_applied = mpc_planner_time.get_latest_result()
         else:
             # Output of the MPC (with delay)
             if type_MPC == True : 
-                f_applied = mpc_wrapper.get_latest_result()
+                f_applied = mpc_planner.get_latest_result()
             else : 
                 f_applied = mpc_planner_time.get_latest_result() 
                 

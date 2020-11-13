@@ -250,6 +250,71 @@ class Joystick:
         if k_loop == 55000:
             self.v_ref = np.array([[0.0, 0.1, 0.0, 0.0, 0.0, 0.2]]).T"""
 
+        if velID == 2:
+            
+            # Video
+            # V_max = 0.6
+            # Rot_max = 0.45 
+            # Vx_max = 0.14
+            # Vy_max = 0.45
+
+            # if k_loop < 3000 : 
+            #     self.v_ref = np.array([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]).T
+
+            # elif k_loop < 6000 : #
+            #     alpha = np.max([np.min([(k_loop-3000)/3000, 1.0]), 0.0])
+            #     self.v_ref = np.array([[V_max*alpha, 0.0, 0.0, 0.0, 0.0, 0.0]]).T            
+
+            # elif k_loop < 9000 :
+            #     alpha = np.max([np.min([(k_loop-6000)/2000, 1.0]), 0.0])
+            #     self.v_ref = np.array([[V_max, 0.0, 0.0, 0.0, 0.0, alpha*Rot_max]]).T
+
+            # elif k_loop < 12000 :
+            #     alpha = np.max([np.min([(k_loop-9000)/2000, 1.0]), 0.0])
+            #     self.v_ref = np.array([[V_max*(1-alpha), 0.0, 0.0, 0.0, 0.0, (1-alpha)*Rot_max]]).T
+            
+            # elif k_loop < 20000 : #
+            #     alpha = np.max([np.min([(k_loop-12000)/3000, 1.0]), 0.0])
+            #     self.v_ref = np.array([[-Vx_max*alpha,Vy_max*alpha, 0.0, 0.0, 0.0, 0.0]]).T
+
+            V_max = 0.8
+            Rot_max = 0.5 
+            Vx_max = 0.14
+            Vy_max = 0.45
+
+            if k_loop < 3000 : 
+                self.v_ref = np.array([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]).T
+
+            elif k_loop < 20000 : 
+                alpha = np.max([np.min([(k_loop-3000)/4000, 1.0]), 0.0])
+                self.v_ref = np.array([[V_max*alpha, 0.0, 0.0, 0.0, 0.0, 0.0]]).T            
+
+            # elif k_loop < 9000 :
+            #     alpha = np.max([np.min([(k_loop-6000)/2000, 1.0]), 0.0])
+            #     self.v_ref = np.array([[V_max, 0.0, 0.0, 0.0, 0.0, alpha*Rot_max]]).T
+
+            # elif k_loop < 12000 :
+            #     alpha = np.max([np.min([(k_loop-9000)/2000, 1.0]), 0.0])
+            #     self.v_ref = np.array([[V_max*(1-alpha), 0.0, 0.0, 0.0, 0.0, (1-alpha)*Rot_max]]).T
+            
+            # elif k_loop < 20000 : #
+            #     alpha = np.max([np.min([(k_loop-12000)/3000, 1.0]), 0.0])
+            #     self.v_ref = np.array([[-Vx_max*alpha,Vy_max*alpha, 0.0, 0.0, 0.0, 0.0]]).T
+        
+
+        
+        if velID == 3:
+            V_max = 0.3
+            Rot_max = 0.3 
+
+            if k_loop < 2000 : 
+                self.v_ref = np.array([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]).T
+
+            elif k_loop < 7000 : #
+                alpha = np.max([np.min([(k_loop-2000)/3000, 1.0]), 0.0])
+                self.v_ref = np.array([[V_max*alpha, 0.0, 0.0, 0.0, 0.0, 0.0]]).T
+
+
         return 0
 
     def update_v_ref_multi_simu(self, k_loop):

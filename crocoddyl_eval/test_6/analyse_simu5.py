@@ -17,14 +17,15 @@ from TSID_Debug_controller_four_legs_fb_vel import controller, dt
 import MPC_Wrapper 
 import FootstepPlanner
 from crocoddyl_class.MPC_crocoddyl_planner_time import *
-
+from crocoddyl_class.MPC_crocoddyl_planner import *
+import Interface
 ####################
 # Recovery of Data
 ####################
 
 folder_name = "log_eval/"
 pathIn = "crocoddyl_eval/test_6/"
-oC = np.load(pathIn + folder_name + "oC.npy" , allow_pickle=True )
+# oC = np.load(pathIn + folder_name + "oC.npy" , allow_pickle=True )
 o_feet_ = np.load(pathIn + folder_name + "o_feet_.npy" , allow_pickle=True ) # global position of the feet
 o_feet_heur = np.load(pathIn + folder_name + "o_feet_heur.npy" , allow_pickle=True )
 gait_ = np.load(pathIn + folder_name + "gait_.npy" , allow_pickle=True )
@@ -33,53 +34,90 @@ ddp_us = np.load(pathIn + folder_name + "pred_forces.npy" , allow_pickle=True )
 l_feet_ = np.load(pathIn + folder_name + "l_feet_.npy" , allow_pickle=True ) # Local position of the feet
 xref = np.load(pathIn + folder_name + "xref.npy" , allow_pickle=True ) 
 
+lfeet_pos =  np.load(pathIn + folder_name + "lfeet_pos.npy" , allow_pickle=True ) 
+lfeet_vel =  np.load(pathIn + folder_name + "lfeet_vel.npy" , allow_pickle=True ) 
+lfeet_acc =  np.load(pathIn + folder_name + "lfeet_acc.npy" , allow_pickle=True ) 
 ####################
 # Iteration 
 ####################
 
-iteration = 120
+iteration = 15
 dt_mpc = 0.01  # Time step of the MPC
 k_mpc = int(dt_mpc / dt)  # dt is dt_tsid, defined in the TSID controller script
 n_periods = 1  # Number of periods in the prediction horizon
 T_gait = 0.28  # Duration of one gait period
 
+# Create Interface object
+interface = Interface.Interface()
+
 # MPC optim period 1
-mpc_planner_time = MPC_crocoddyl_planner_time(dt = dt_mpc , T_mpc = T_gait, n_periods = n_periods , min_fz = 1)
-mpc_planner_time.term_factor = 5
-mpc_planner_time.vlim = 1.5
-mpc_planner_time.speed_weight2 = 1.
+mpc_planner_time = MPC_crocoddyl_planner(dt = dt_mpc , T_mpc = fstep_planner.T_gait , n_periods = n_periods)
+mpc_planner_time_2 = MPC_crocoddyl_planner_time(dt = dt_mpc , T_mpc = T_gait, n_periods = n_periods , min_fz = 1)
+# mpc_planner_time.term_factor = 5
+# mpc_planner_time.vlim = 1.5
 
-# Weight on the shoulder term : 
-mpc_planner_time.shoulderWeights = 0.1
-mpc_planner_time.shoulder_hlim = 0.21 
 
-# Cost weights
-# Augmented state weights : 
-mpc_planner_time.dt_weight_bound = 0.  
-mpc_planner_time.forceWeights = np.array(12*[0.01])     # ||u||^2
-mpc_planner_time.relative_forces = True                 # ||fz-mg/nb_contact||^2
+mpc_planner_time_2.speed_weight2 = 0.1
+mpc_planner_time_2.speed_weight_first = 2
+mpc_planner_time_2.stepWeights = np.array([0.05,0.1,0.05,0.1])   
+mpc_planner_time_2.stepWeights2 = np.array([0.05,0.1,0.05,0.1]) 
+mpc_planner_time_2.dt_weight_bound_cmd = 100000. 
+mpc_planner_time_2.vlim = 1.
 
-# Step DT Weights : 
-mpc_planner_time.dt_weight_cmd = 10000. # Weight on ||U-dt_ref|| --> Fix dt value
-mpc_planner_time.dt_ref = 0.02
-mpc_planner_time.dt_weight_bound_cmd = 10000.    # (dt_min - dt)^+ ; (dt-dt_max)^+
-mpc_planner_time.stepWeights = np.array([0.1,0.3,0.1,0.3])   
+mpc_planner_time.speed_weight2 = 0
+mpc_planner_time_2.speed_weight_first = 1
+# # Weight on the shoulder term : 
+# mpc_planner_time.shoulderWeights = 0.1
+# mpc_planner_time.shoulder_hlim = 0.21 
+
+# # Cost weights
+# # Augmented state weights : 
+# mpc_planner_time.dt_weight_bound = 0.  
+# mpc_planner_time.forceWeights = np.array(12*[0.01])     # ||u||^2
+# mpc_planner_time.relative_forces = True                 # ||fz-mg/nb_contact||^2
+
+# # Step DT Weights : 
+# mpc_planner_time.dt_weight_cmd = 10000. # Weight on ||U-dt_ref|| --> Fix dt value
+# mpc_planner_time.dt_ref = 0.02
+# mpc_planner_time.dt_weight_bound_cmd = 10000.    # (dt_min - dt)^+ ; (dt-dt_max)^+
+# mpc_planner_time.stepWeights = np.array([0.1,0.3,0.1,0.3])   
+# mpc_planner_time.stepWeights2 = np.array([0.1,0.2,0.1,0.2]) 
 
 
 # mpc_planner_time.solve(k, fstep_planner.xref , interface.l_feet , interface.oMl)
-for i in range(iteration) : 
-    if i > 0:            
-        mpc_planner_time.roll()         
-    else : 
-        # Create gait matrix
-        mpc_planner_time.create_walking_trot()
+for i in range(iteration-1) : 
+    # if i > 0:            
+    #     mpc_planner_time.roll()         
+    # else : 
+    #     # Create gait matrix
+    #     mpc_planner_time.create_walking_trot()
+    interface.l_feet = lfeet_pos[:,:,i*k_mpc]
+    interface.lv_feet = lfeet_vel[:,:,i*k_mpc]
+    interface.la_feet = lfeet_acc[:,:,i*k_mpc]
+    if i == 100+(iteration - 2 ) :
+        xref2 = xref[:,:,i]
+        xref2[6,1:] = 0.6
+        xref2[7,1:] = 0.6
+    else :
+        xref2 = xref[:,:,i]
+    mpc_planner_time.solve( i , xref2 ,  interface)
+    mpc_planner_time_2.solve(i , xref2 , interface )
+    # print(i+1)
+    # print(xref[:,0,i])
+
+    # for elt in mpc_planner_time.ddp.problem.runningModels : 
+ 
+    #     print(elt.__class__.__name__)
 
 p0 = np.zeros(8)
 for k in range(4) : 
     p0[2*k] = l_feet_[:,:,i][0,k]
     p0[2*k+1] = l_feet_[:,:,i][1,k]
 
-xref[6:9,0,i] = np.array([1.5,1.5,0.0])
+p0[2] = 0.19
+p0[3] = 0.15
+
+# xref[6:9,0,i] = np.array([1.5,1.5,0.0])
 
 #################################################################################################################
 def get_results(ddp) :
@@ -147,7 +185,7 @@ def get_results(ddp) :
             gap += 1
             
         else : 
-            x_foot_change.append(lt_state[index-gap])
+            # x_foot_change.append(lt_state[index-gap])
             speedCost[index-gap] = elt.Cost[3]
             deltaFoot[index-gap] = elt.Cost[2]
             gap += 1
@@ -166,26 +204,26 @@ def get_results(ddp) :
 # Update intern MPC parameters
 #################################
 
-mpc_planner_time.updateProblem( iteration , xref[:,:,iteration] , l_feet_[:,:,iteration] )
-# Solve problem
-mpc_planner_time.ddp.solve(mpc_planner_time.x_init,mpc_planner_time.u_init, 50)  
+# mpc_planner_time.updateProblem( iteration , xref[:,:,iteration] , l_feet_[:,:,iteration] )
+# # Solve problem
+# mpc_planner_time.ddp.solve(mpc_planner_time.x_init,mpc_planner_time.u_init, 50)  
 
 
 ddp1 = mpc_planner_time.ddp
 gait = mpc_planner_time.gait
-
 Xs_1 , Us_1 , lt_state_1 , lt_force_1 , Cost_1 , x_dt_change_1 , x_foot_change_1 , results_dt_1 , fsteps_1 = get_results(ddp1)
 
-for i in range(len(mpc_planner_time.ddp.problem.runningModels)) : 
-    if mpc_planner_time.ddp.problem.runningModels[i].nu == 4 : 
-        # mpc_planner_time.ddp.problem.runningModels[i].dt_weight_cmd = 0.  
-        mpc_planner_time.ddp.problem.runningModels[i].speed_weight = mpc_planner_time.speed_weight2
-    if mpc_planner_time.ddp.problem.runningModels[i].nu == 1 :
-        mpc_planner_time.ddp.problem.runningModels[i].dt_weight_cmd = 0
+# for i in range(len(mpc_planner_time.ddp.problem.runningModels)) : 
+#     for i in range(len(mpc_planner_time.ddp.problem.runningModels)) : 
+#             if mpc_planner_time.ddp.problem.runningModels[i].nu == 4 :                 
+#                 mpc_planner_time.ddp.problem.runningModels[i].speed_weight = mpc_planner_time.speed_weight2
+#                 mpc_planner_time.ddp.problem.runningModels[i].stepWeights = mpc_planner_time.stepWeights
+#             if mpc_planner_time.ddp.problem.runningModels[i].nu == 1 :  
+#                 mpc_planner_time.ddp.problem.runningModels[i].dt_weight_cmd = 0.  
 
-mpc_planner_time.ddp.solve(mpc_planner_time.ddp.xs,mpc_planner_time.ddp.us,100, isFeasible=True) 
+# mpc_planner_time.ddp.solve(mpc_planner_time.ddp.xs,mpc_planner_time.ddp.us,100, isFeasible=True) 
 
-ddp2 = mpc_planner_time.ddp
+ddp2 = mpc_planner_time_2.ddp
 Xs_2 , Us_2 , lt_state_2 , lt_force_2 , Cost_2 , x_dt_change_2 , x_foot_change_2 , results_dt_2 , fsteps_2 = get_results(ddp2)
 
 #############

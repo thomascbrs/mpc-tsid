@@ -34,7 +34,7 @@ xref = np.load(pathIn + folder_name + "xref.npy")
 # Iteration 
 ####################
 
-iteration = 0
+iteration = 50
 
 dt_mpc = 0.02  # Time step of the MPC
 k_mpc = int(dt_mpc / dt)  # dt is dt_tsid, defined in the TSID controller script
@@ -56,6 +56,10 @@ Relaunch_DDP = True
 enable_multiprocessing = False
 mpc_wrapper_ddp = MPC_Wrapper.MPC_Wrapper(False, dt_mpc, fstep_planner.n_steps,
                                         k_mpc, fstep_planner.T_gait, enable_multiprocessing)
+
+mpc_wrapper_ddp.mpc.relative_forces = True
+mpc_wrapper_ddp.mpc.implicit_integration = True
+mpc_wrapper_ddp.mpc.updateActionModel()
 # osqp gains 
 
 # w_x = np.sqrt(0.5)
@@ -119,11 +123,11 @@ for i in range(12):
     plt.subplot(3, 4, index[i])
     
     pl1, = plt.plot(l_t, ddp_xs[i,:,iteration], linewidth=2, marker='x')
-    pl2, = plt.plot(l_t, osqp_xs[i,:,iteration], linewidth=2, marker='x')
+    # pl2, = plt.plot(l_t, osqp_xs[i,:,iteration], linewidth=2, marker='x')
 
     if Relaunch_DDP : 
         pl3, = plt.plot(l_t, mpc_wrapper_ddp.mpc.get_xrobot()[i,:], linewidth=2, marker='x')
-        plt.legend([pl1,pl2,pl3] , [l_str2[i] , l_str[i], "ddp_redo" ])
+        plt.legend([pl1,pl3] , [l_str2[i] ,  "ddp_implicit" ])
 
     elif Relaunch_OSQP : 
         pl4, = plt.plot(l_t, mpc_wrapper_osqp.mpc.x_robot[i,:], linewidth=2, marker='x')
@@ -143,7 +147,7 @@ plt.figure()
 for i in range(12):
     plt.subplot(3, 4, index[i])
     pl1, = plt.plot(l_t, ddp_us[i,:,iteration], linewidth=2, marker='x')
-    pl2, = plt.plot(l_t, osqp_us[i,:,iteration], linewidth=2, marker='x')
+    # pl2, = plt.plot(l_t, osqp_us[i,:,iteration], linewidth=2, marker='x')
 
     # if i % 3*i == 0 :  
     #     print(i)
@@ -161,7 +165,7 @@ for i in range(12):
    
     if Relaunch_DDP : 
         pl3, = plt.plot(l_t, mpc_wrapper_ddp.mpc.get_fpredicted()[i,:], linewidth=2, marker='x')
-        plt.legend([pl1,pl2,pl3] , [l_str2[i] , l_str[i], "ddp_redo" ])
+        plt.legend([pl1,pl3] , [l_str2[i] ,  "ddp_implicit" ])
 
     elif Relaunch_OSQP : 
         pl4, = plt.plot(l_t, mpc_wrapper_osqp.mpc.x[mpc_wrapper_osqp.mpc.xref.shape[0]*(mpc_wrapper_osqp.mpc.xref.shape[1]-1):].reshape((mpc_wrapper_osqp.mpc.xref.shape[0],

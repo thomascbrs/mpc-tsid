@@ -405,10 +405,23 @@ class pybullet_simulator:
                 self.flag_sphere2 = False
 
         # Apply perturbation
-        if (k >= 500) and (k <= 700):
-            pyb.applyExternalForce(self.robotId, -1, [0, -17, 0.0], [0.0, 0.0, 0.0], pyb.LINK_FRAME)
-        if k == 1201:
-            print("End external force")
+        # it = 55
+        # dt = 10
+        # if k == it*10 : 
+        #     print("-------------------APPLY EXT FORCES -----------------------")
+        # if (k >= it*10) and (k <= it*10 + dt):
+        #     pyb.applyExternalForce(self.robotId, -1, [0, -165, 0.0], [0.0, 0.0, 0.0], pyb.LINK_FRAME)
+        # if k == it*10 + dt:
+        #     print("-------------------END EXT FORCES -----------------------")
+
+        it = 55
+        dt = 10
+        if k == it*10 : 
+            print("-------------------APPLY EXT FORCES -----------------------")
+        if (k >= it*10) and (k <= it*10 + dt):
+            pyb.applyExternalForce(self.robotId, -1, [0, -165, 0.0], [0.0, 0.0, 0.0], pyb.LINK_FRAME)
+        if k == it*10 + dt:
+            print("-------------------END EXT FORCES -----------------------")
 
         # Update the PyBullet camera on the robot position to do as if it was attached to the robot
         """pyb.resetDebugVisualizerCamera(cameraDistance=0.75, cameraYaw=+50, cameraPitch=-35,
@@ -418,7 +431,9 @@ class pybullet_simulator:
         RPY = pin.rpy.matrixToRpy(oMb_tmp.rotation)
 
         # Update the PyBullet camera on the robot position to do as if it was attached to the robot
-        pyb.resetDebugVisualizerCamera(cameraDistance=0.8, cameraYaw=(0.0*RPY[2]*(180/3.1415)+50), cameraPitch=-27.9,
+        # pyb.resetDebugVisualizerCamera(cameraDistance=0.8, cameraYaw=(0.0*RPY[2]*(180/3.1415)+50), cameraPitch=-27.9,
+        #                                cameraTargetPosition=[qmes12[0, 0], qmes12[1, 0] + 0.0, 0.0])
+        pyb.resetDebugVisualizerCamera(cameraDistance=0.67, cameraYaw=(0.0*RPY[2]*(180/3.1415)+50), cameraPitch=-31,
                                        cameraTargetPosition=[qmes12[0, 0], qmes12[1, 0] + 0.0, 0.0])
 
         return 0

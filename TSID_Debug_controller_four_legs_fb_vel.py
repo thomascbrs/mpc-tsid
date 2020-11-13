@@ -7,13 +7,15 @@
 #                                                                      #
 ########################################################################
 
-from matplotlib import pyplot as plt
+# from matplotlib import pyplot as plt
+import pybullet as pyb
 import pinocchio as pin
+
 import numpy as np
 import numpy.matlib as matlib
 import tsid
 import FootTrajectoryGenerator as ftg
-import pybullet as pyb
+
 import utils
 import time
 
@@ -109,7 +111,7 @@ class controller:
         self.k_mpc = k_mpc
 
         # For update_feet_tasks function
-        self.dt = 0.0010  #  [s], time step
+        self.dt = 0.001  #  [s], time step
         self.t1 = T_gait * 0.5 - 0.02  # [s], duration of swing phase # not used
 
         # Rotation matrix
@@ -308,10 +310,13 @@ class controller:
                     self.t_swing_variable[i] = gait[0,0]*self.dt*self.k_mpc
             
             
-            # else : 
-            #     for i in feet : 
-            #         if int(self.gait_old[0,0] - gait[0,0]) != 1 : 
-            #             self.t_swing_variable[i] += (gait[0,0] - gait_old[0,0] + 1)*self.dt*self.k_mpc
+            else : 
+                for i in feet : 
+                    if int(self.gait_old[0,0] - gait[0,0]) != 1 : 
+                        self.t_swing_variable[i] += (gait[0,0] - self.gait_old[0,0] + 1)*self.dt*self.k_mpc
+            
+            # print("t_swing variable")
+            # print(self.t_swing_variable)
                     
 
         t0s = []
@@ -337,8 +342,14 @@ class controller:
             self.t_swing[i] = self.t_swing_variable[i]
         
 
-            t0s.append(np.round(np.max((self.t_swing[i] - remaining_iterations * self.dt - self.dt, 0.0)), decimals=3))
+            t0s.append(np.round(np.max((self.t_swing[i] - remaining_iterations * self.dt, 0.0)), decimals=3))
+            # t0s.append(np.round(np.max((self.t_swing[i] - remaining_iterations * self.dt - self.dt, 0.0)), decimals=3))
 
+        
+        # if (k_loop % self.k_mpc == 0) :
+        #     print("t_swing variable")
+        #     print(self.t_swing_variable)
+        # print(k_loop)
         # print(t0s)
 
         # self.footsteps contains the target (x, y) positions for both feet in swing phase
@@ -498,6 +509,7 @@ class controller:
         gait2[:index, 1:] = 1.0 - (np.isnan(fsteps[:index, 1::3]) | (fsteps[:index, 1::3] == 0.0))
         # print(k_loop)
         # print(gait - gait2)
+        # print(gait2[0,:])
 
         # Enable/disable contact and 3D tracking tasks depending on the state of the feet (swing or stance phase)
         self.update_tasks(k_simu, k_loop, looping, interface, gait2, ftps_Ids_deb )
@@ -517,7 +529,7 @@ class controller:
         ###########
 
         # Refresh Gepetto Viewer
-        # solo.display(self.qtsid)
+        solo.display(self.qtsid)
 
         return 0
 
@@ -849,4 +861,4 @@ class controller:
 # Parameters for the controller
 
 
-dt = 0.0010		# controller time step
+dt = 0.001	# controller time step

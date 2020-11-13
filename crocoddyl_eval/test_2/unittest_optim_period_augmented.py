@@ -24,16 +24,18 @@ epsilon = 1e-3
 ################################################
 ## CHECK DERIVATIVE WITH NUM_DIFF , 
 #################################################
+actionModelRef = quadruped_walkgen.ActionModelQuadrupedAugmented()
 
-actionModel = quadruped_walkgen.ActionModelQuadrupedAugmentedTime()
+actionModel = quadruped_walkgen.ActionModelQuadrupedAugmented()
 
 actionModel.heuristicWeights  =  np.zeros(8)
 actionModel.lastPositionWeights = np.zeros(8)
 actionModel.frictionWeights = 0.
 actionModel.stateWeights = np.zeros(12)
-# actionModel.forceWeights = np.zeros(12)
+actionModel.forceWeights = np.zeros(12)
 actionModel.dt_weight_bound = 0.
 actionModel.relative_forces = True
+# actionModel.shoulderWeights = 0
 data = actionModel.createData()
 
 # RUN CALC DIFF
@@ -57,7 +59,7 @@ def run_calcDiff_numDiff(epsilon) :
 
   for k in range(N_trial):    
 
-    x = a + (b-a)*np.random.rand(21)
+    x = a + (b-a)*np.random.rand(20)
     x[-1] = np.random.rand(1)[0] #dt > 0 
     u = c + (d-c)*np.random.rand(12)
 
@@ -75,6 +77,7 @@ def run_calcDiff_numDiff(epsilon) :
 
     actionModel.updateModel(l_feet , xref , S )
     model_diff = crocoddyl.ActionModelNumDiff(actionModel)
+    # model_diff = quadruped_walkgen.ActionModelQuadrupedAugmented()
     dataCpp = model_diff.createData()
     
    

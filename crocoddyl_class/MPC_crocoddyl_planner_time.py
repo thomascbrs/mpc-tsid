@@ -36,7 +36,6 @@ class MPC_crocoddyl_planner_time():
         self.mass = 2.50000279 
 
         # Inertia matrix of the robot in body frame 
-        # self.gI = np.diag([0.00578574, 0.01938108, 0.02476124])
         self.gI = np.array([[3.09249e-2, -8.00101e-7, 1.865287e-5],
                         [-8.00101e-7, 5.106100e-2, 1.245813e-4],
                         [1.865287e-5, 1.245813e-4, 6.939757e-2]])  
@@ -48,16 +47,13 @@ class MPC_crocoddyl_planner_time():
             self.mu = mu
         
         # Weights Vector : States
-        # self.stateWeights = np.array([1,1,150,35,30,8,20,20,15,4,4,8])
-        # Weights Vector : States
         self.w_x = 0.3
         self.w_y = 0.3
         self.w_z = 2
         self.w_roll = 0.9
         self.w_pitch = 1.
         self.w_yaw = 0.4
-        # self.w_vx =  1.5*np.sqrt(self.w_x)
-        self.w_vx =  1.5*np.sqrt(0.3)
+        self.w_vx =  1.5*np.sqrt(self.w_x)
         self.w_vy =  2*np.sqrt(self.w_y)
         self.w_vz =  1*np.sqrt(self.w_z)
         self.w_vroll =  0.05*np.sqrt(self.w_roll)
@@ -67,26 +63,21 @@ class MPC_crocoddyl_planner_time():
                                     self.w_vx, self.w_vy, self.w_vz, self.w_vroll, self.w_vpitch, self.w_vyaw])
 
         # Weight Vector : Force Norm
-        # self.forceWeights = np.full(12,0.02)
         self.forceWeights = np.array(4*[0.01,0.01,0.01])
 
         # Weight Vector : Friction cone cost
-        # self.frictionWeights = 10
-        self.frictionWeights = 3.
+        self.frictionWeights = 10.
 
-        # Max iteration ddp solver
-        self.max_iteration = 100
+        
 
-        # Warm Start for the solver
-        self.warm_start = warm_start
-
-        # Minimum normal force (N)
+        # Min/Max normal force (N)
         self.min_fz = min_fz
         self.max_fz = 25
 
         # Gait matrix
         self.gait = np.zeros((20, 5))
         self.gait_old = np.zeros((20, 5))
+        # Index of the last line
         self.index = 0
 
         # Position of the feet in local frame
@@ -101,22 +92,19 @@ class MPC_crocoddyl_planner_time():
 
         # Weights on the shoulder term : term 1
         # self.shoulderWeights = np.array(4*[0.3,0.4])
-        # Weights on the shoulder term : term 1
         self.heuristicWeights = np.array(4*[0.0,0.0])
-        # self.heuristicWeights = np.full(8,0.)
         # symmetry & centrifugal term in foot position heuristic
         self.centrifugal_term = True
         self.symmetry_term = True
 
         # Weight on the step command
-        self.stepWeights = np.array([0.1,0.3,0.1,0.3])   
-        self.stepWeights2 = np.array([0.2,0.4,0.2,0.4]) 
-        # self.stepWeights = np.array([0.1,0.15,0.1,0.15])
-        # self.stepWeights = np.array([0.01,0.01,0.01,0.01])   
+        # self.stepWeights = np.array([0.1,0.3,0.1,0.3])   
+        # self.stepWeights2 = np.array([0.2,0.4,0.2,0.4]) 
+        self.stepWeights = np.array([0.4,0.4,0.4,0.4])   
+        self.stepWeights2 =  np.array([0.4,0.4,0.4,0.4]) 
 
         # Weight on the step command for dt : 
         self.dt_ref = 0.02 # 0.5*dt_weight^2*||dt - dt_ref||^2
-        self.dt_initial = 0.02
         self.dt_weight = 0.0
 
         N_nodes = self.T_mpc/self.dt * n_periods / 2
@@ -128,8 +116,7 @@ class MPC_crocoddyl_planner_time():
         # print("dt_min : " , self.dt_min)
         # print("dt_max : " , self.dt_max)
 
-        # Weight for period optim
-        self.vlim = 1.5
+        
         self.speed_weight = 0
         self.nb_nodes = self.T_mpc/self.dt * n_periods / 2 - 1 
 
@@ -150,7 +137,13 @@ class MPC_crocoddyl_planner_time():
         # the self.lastPositionWeights weight.
         # The world position of foot can be used with interface.oMl ...
         self.l_fsteps = np.zeros((3,4))   
-        self.o_fsteps = np.zeros((3,4))   
+        self.o_fsteps = np.zeros((3,4)) 
+
+        # Max iteration ddp solver
+        self.max_iteration = 100
+
+        # Warm Start for the solver
+        self.warm_start = warm_start  
         
         # Shooting problem
         self.problem = None
@@ -173,7 +166,7 @@ class MPC_crocoddyl_planner_time():
         self.gait_new = np.zeros((20, 5))
 
         # Weights for dt model : 
-        self.dt_weight_bound_cmd = 10000. # Upper/lower bound
+        self.dt_weight_bound_cmd = 1000000. # Upper/lower bound
         self.dt_weight_cmd = 0. # ||U-dt||^2
         # States
         # Heuristic position
@@ -182,7 +175,7 @@ class MPC_crocoddyl_planner_time():
 
         #Param for gait
         self.nb_nodes_horizon = 8
-        self.T_min = 0.28
+        self.T_min = 0.32
         self.T_max = 0.82
         self.node_init = self.T_min/(2*self.dt) - 1
         self.dt_init = self.dt
@@ -193,13 +186,20 @@ class MPC_crocoddyl_planner_time():
 
          # Weight on the shoulder term : 
         self.shoulderWeights = 0.1
-        self.shoulder_hlim = 0.21 
+        self.shoulder_hlim = 0.225 
         self.speed_weight2 = 5
 
+        self.speed_weight_first = 1.
+        self.feet_param = np.zeros((3,4))
+        self.first_step = True
+        # Weight for period optim
+        self.vlim = 1.5
+        # self.vlim = 3.6
 
 
 
-    def solve(self, k, xref , l_feet , oMl = pin.SE3.Identity()):
+
+    def solve(self, k, xref , interface , oMl = pin.SE3.Identity()):
         """ Solve the MPC problem 
 
         Args:
@@ -208,19 +208,26 @@ class MPC_crocoddyl_planner_time():
             l_feet : current position of the feet
         """ 
 
-        # Update the dynamic depending on the predicted feet position
-        self.updateProblem( k , xref , l_feet , oMl)
 
-        print(self.gait[:2,:])
+        # Update the dynamic depending on the predicted feet position
+        self.updateProblem( k , xref , interface , oMl)
+
+        # print(self.gait[:2,:])
+        # print(interface.l_feet)
         # for elt in self.ddp.problem.runningModels : 
         #     print(elt.__class__.__name__)
 
         # Solve problem
-        self.ddp.solve(self.x_init,self.u_init, 50)  
-
+        self.ddp.solve(self.x_init,self.u_init, 100) 
+ 
+        print(self.gait[0,:])
+        print(self.xref[6:9,0])
         for i in range(len(self.ddp.problem.runningModels)) : 
-            if self.ddp.problem.runningModels[i].nu == 4 :                 
-                self.ddp.problem.runningModels[i].speed_weight = self.speed_weight2
+            if self.ddp.problem.runningModels[i].nu == 4 :  
+                if self.ddp.problem.runningModels[i].first_step == True : 
+                    self.ddp.problem.runningModels[i].speed_weight = self.speed_weight_first
+                else : 
+                    self.ddp.problem.runningModels[i].speed_weight = self.speed_weight2
                 self.ddp.problem.runningModels[i].stepWeights = self.stepWeights
             if self.ddp.problem.runningModels[i].nu == 1 :  
                 self.ddp.problem.runningModels[i].dt_weight_cmd = 0.  
@@ -234,7 +241,7 @@ class MPC_crocoddyl_planner_time():
 
         return 0
 
-    def updateProblem(self,k,xref , l_feet , oMl = pin.SE3.Identity() ):
+    def updateProblem(self,k,xref , interface , oMl = pin.SE3.Identity()   ):
         """Update the dynamic of the model list according to the predicted position of the feet, 
         and the desired state. 
         self.o_feet = np.zeros((3, 4))  # position of feet in world frame
@@ -249,24 +256,24 @@ class MPC_crocoddyl_planner_time():
         if k > 0:            
             # Move one step further in the gait 
             self.roll()     
-            # if np.sum(self.gait[0,1:]) == 4 : 
-            #     # 4 contact --> need previous control cycle to know which foot was on the ground
-            #     # On swing phase before --> initialised below shoulder
-            #     self.p0 = np.repeat(np.array([1,1,1,1])-self.gait_old[0,1:],2)*self.shoulderPosition
-            #     # On the ground before -->  initialised with the current feet position
-            #     self.p0 +=  np.repeat(self.gait_old[0,1:],2)*l_feet[0:2,:].reshape(8, order = 'F')
-            # else : 
-            #     # On swing phase before --> initialised below shoulder
-            #     self.p0 = np.repeat(np.array([1,1,1,1])-self.gait[0,1:],2)*self.shoulderPosition  
-            #     # On the ground before -->  initialised with the current feet position
-            #     self.p0 +=  np.repeat(self.gait[0,1:],2)*l_feet[0:2,:].reshape(8, order = 'F')      
+            if np.sum(self.gait[0,1:]) == 4 : 
+                # 4 contact --> need previous control cycle to know which foot was on the ground
+                # On swing phase before --> initialised below shoulder
+                self.p0 = np.repeat(np.array([1,1,1,1]) - self.gait_old[0,1:],2)*(self.shoulderPosition + np.concatenate(4*[xref[:2,int(self.gait[0,0]) ]] ) )
+                # On the ground before -->  initialised with the current feet position
+                self.p0 += np.repeat(self.gait_old[0,1:],2)*interface.l_feet[0:2,:].reshape(8, order = 'F')
+            else : 
+                # On swing phase before --> initialised below shoulder
+                self.p0 = np.repeat(np.array([1,1,1,1]) - self.gait[0,1:],2)*(self.shoulderPosition + np.concatenate(4*[xref[:2,int(self.gait[0,0]) ]  ]) )
+                # On the ground before -->  initialised with the current feet position
+                self.p0 +=  np.repeat(self.gait[0,1:],2)*interface.l_feet[0:2,:].reshape(8, order = 'F')      
        
         else : 
             # Create gait matrix
             self.create_walking_trot()
 
-        # Update initial state of the problem
-        self.p0 = l_feet[0:2,:].reshape(8, order = 'F')
+            # Update initial state of the problem
+            self.p0 = interface.l_feet[0:2,:].reshape(8, order = 'F')
 
         # create xref vector
         # Only velocities are used here, x,y,yaw free
@@ -280,7 +287,7 @@ class MPC_crocoddyl_planner_time():
         # --> adaptation in velocities and z position
         self.xref[6:,1:] = np.tile(xref[6:,1] , (self.xref.shape[1] - 1,1)).transpose()
 
-        self.create_List_model()
+        self.create_List_model( interface)
 
         return 0       
         
@@ -329,7 +336,8 @@ class MPC_crocoddyl_planner_time():
         if optim_period : 
             # model.heuristicWeights =  np.zeros(8)
             model.heuristicWeights  = self.heuristicWeights
-            model.stateWeights = np.concatenate([np.array([0.0, 0.0, ]), self.stateWeights[2:]])
+            # model.stateWeights = np.concatenate([np.array([0.0, 0.0, ]), self.stateWeights[2:]])
+            model.stateWeights =  self.stateWeights
         else : 
             model.heuristicWeights =  self.heuristicWeights
             model.stateWeights =  self.stateWeights
@@ -384,10 +392,58 @@ class MPC_crocoddyl_planner_time():
 
         return 0
 
-    def create_List_model(self):
+    def create_List_model(self  , interface):
         """Create the List model using ActionQuadrupedModel()  
          The same model cannot be used [model]*(T_mpc/dt) because the dynamic changes for each nodes
         """
+
+        # Prepare pos,vel,acc f flying feet for step feet model and trajectory 5D
+        j = 0 
+        while(np.sum(self.gait[j,1:]) != 4 ):
+            j = j+1
+        
+        if j == 0 :
+            gait_flying = self.gait[j,1:] - self.gait_old[0,1:]
+        else : 
+            gait_flying = self.gait[j,1:] - self.gait[j-1,1:]
+        
+        if gait_flying[0] == 1 : 
+            # 1 00 1
+            # pos speed acc px, 1
+            self.feet_param[0,0] =  self.p0[0] - interface.l_feet[0,0]
+            self.feet_param[1,0] = interface.lv_feet[0,0]
+            self.feet_param[2,0] = interface.la_feet[0,0]
+            # pos speed acc py, 1
+            self.feet_param[0,1] = self.p0[1] - interface.l_feet[1,0]
+            self.feet_param[1,1] = interface.lv_feet[1,0]
+            self.feet_param[2,1] = interface.la_feet[1,0]
+
+            self.feet_param[0,2] = self.p0[6] - interface.l_feet[0,3]
+            self.feet_param[1,2] = interface.lv_feet[0,3]
+            self.feet_param[2,2] = interface.la_feet[0,3]
+            # pos speed acc py, 1
+            self.feet_param[0,3] = self.p0[7] - interface.l_feet[1,3]
+            self.feet_param[1,3] = interface.lv_feet[1,3]
+            self.feet_param[2,3] = interface.la_feet[1,3]
+        else : 
+            #0 1 1 0
+            self.feet_param[0,0] = self.p0[2] - interface.l_feet[0,1]
+            self.feet_param[1,0] = interface.lv_feet[0,1]
+            self.feet_param[2,0] = interface.la_feet[0,1]
+            # pos speed acc py, 1
+            self.feet_param[0,1] = self.p0[3] - interface.l_feet[1,1]
+            self.feet_param[1,1] = interface.lv_feet[1,1]
+            self.feet_param[2,1] = interface.la_feet[1,1]
+
+            self.feet_param[0,2] = self.p0[4] - interface.l_feet[0,2]
+            self.feet_param[1,2] = interface.lv_feet[0,2]
+            self.feet_param[2,2] = interface.la_feet[0,2]
+            # pos speed acc py, 1
+            self.feet_param[0,3] = self.p0[5] - interface.l_feet[1,2]
+            self.feet_param[1,3] = interface.lv_feet[1,2]
+            self.feet_param[2,3] = interface.la_feet[1,2]
+        
+        # self.feet_param = np.zeros((3,4))
 
         j = 0
         k_cum = 0
@@ -424,6 +480,18 @@ class MPC_crocoddyl_planner_time():
 
                 elif j == 0 and np.sum(self.gait[j, 1:]) == 4 :
 
+                    if np.sum(self.gait[0,1:] - self.gait_old[0,1:]) != 0 and i == 0 : 
+                        model = quadruped_walkgen.ActionModelQuadrupedStepTime()
+                        self.update_model_step_feet(model , True)                
+
+                        model.updateModel(self.feet_param , self.xref[:, i]  ,  self.gait[j, 1:] - self.gait_old[j, 1:])
+                        model.nb_nodes = self.gait[j,0]
+                        model.first_step = self.first_step
+                        # Update intern parameters
+                        self.ListAction.append(model)
+                        self.x_init.append(x1)
+                        self.u_init.append(np.zeros(4))
+
                     if i == 1 : 
                         # 2 | 1 1 1 1 
                         modelTime = quadruped_walkgen.ActionModelQuadrupedTime()
@@ -439,16 +507,7 @@ class MPC_crocoddyl_planner_time():
                         self.x_init.append(x1)
                         self.u_init.append(np.array([self.dt_init]))
 
-
-                    model = quadruped_walkgen.ActionModelQuadrupedStepTime()
-                    self.update_model_step_feet(model , True)                
-
-                    model.updateModel(np.reshape(self.l_fsteps, (3, 4), order='F') , self.xref[:, i]  ,  self.gait[j, 1:] - self.gait_old[j, 1:])
-                    model.nb_nodes = self.gait[j,0]
-                    # Update intern parameters
-                    self.ListAction.append(model)
-                    self.x_init.append(x1)
-                    self.u_init.append(np.zeros(4))
+                    
 
                 
 
@@ -463,7 +522,23 @@ class MPC_crocoddyl_planner_time():
                 self.x_init.append(x1)
                 self.u_init.append(np.repeat(self.gait[j,1:] , 3)*u1)
             
-            if np.sum(self.gait[j+1, 1:]) == 4 : # No optimisation on the first line   
+            if np.sum(self.gait[j+1, 1:]) == 4 : # No optimisation on the first line                   
+            
+                model = quadruped_walkgen.ActionModelQuadrupedStepTime()
+                self.update_model_step_feet(model , True)
+            
+
+                model.updateModel(self.feet_param , self.xref[:, i+1]  ,  self.gait[j+1, 1:] - self.gait[j, 1:])
+                model.nb_nodes = self.gait[j,0]
+                model.vlim = self.vlim
+                if j == 1 : 
+                    model.first_step = self.first_step
+                else : 
+                    model.first_step = False
+                # Update intern parameters
+                self.ListAction.append(model)
+                self.x_init.append(x1)
+                self.u_init.append(np.zeros(4))
 
                 if j == 0 and np.sum(self.gait[0,0]) == 1 : 
                         # 1 | 1 0 0 1
@@ -480,18 +555,6 @@ class MPC_crocoddyl_planner_time():
                         self.ListAction.append(modelTime)   
                         self.x_init.append(x1)
                         self.u_init.append(np.array([self.dt_init])) 
-            
-                model = quadruped_walkgen.ActionModelQuadrupedStepTime()
-                self.update_model_step_feet(model , True)
-            
-
-                model.updateModel(np.reshape(self.l_fsteps, (3, 4), order='F') , self.xref[:, i+1]  ,  self.gait[j+1, 1:] - self.gait[j, 1:])
-                model.nb_nodes = self.gait[j,0]
-                model.vlim = self.vlim
-                # Update intern parameters
-                self.ListAction.append(model)
-                self.x_init.append(x1)
-                self.u_init.append(np.zeros(4))
                     
             if np.sum(self.gait[j+1, 1:]) == 2 :    
 
@@ -584,6 +647,7 @@ class MPC_crocoddyl_planner_time():
         
         # Index of the first empty line
         # index = next((idx for idx, val in np.ndenumerate(self.gait[:, 0]) if val==0.0), 0.0)[0]
+        self.gait_old = self.gait
 
         if int(self.gait[0,0]) > 1 : # no need switch
             self.gait[0,0] -= 1 
@@ -683,13 +747,17 @@ class MPC_crocoddyl_planner_time():
                     self.gait_new[j,0] =  np.around(1 + ((self.gait[j,0] - 1)*self.Xs[20,k_cum + 1] / self.dt)  ,decimals = 0)
                 elif j == 1 and int(np.sum(self.gait[1,1:])) == 4 :
                     # No 1st node
-                    self.fsteps[j,0] = np.around((self.gait[j,0]*self.Xs[20,k_cum] / self.dt)  ,decimals = 0)
-                    self.gait_new[j,0] =  np.around((self.gait[j,0]*self.Xs[20,k_cum] / self.dt)  ,decimals = 0)
+                    # self.fsteps[j,0] = np.around((self.gait[j,0]*self.Xs[20,k_cum] / self.dt)  ,decimals = 0)
+                    # self.gait_new[j,0] =  np.around((self.gait[j,0]*self.Xs[20,k_cum] / self.dt)  ,decimals = 0)
+                    self.fsteps[j,0] = self.gait[j,0]
+                    self.gait_new[j,0] = self.gait[j,0]
                 else : 
                     self.fsteps[j,0] = self.gait[j,0]
                     self.gait_new[j,0] = self.gait[j,0]
             else : 
                 if j == 1 and np.sum(self.gait[1,1:]) == 4 : 
+                    # self.fsteps[j,0] = self.gait[j,0]
+                    # self.gait_new[j,0] = self.gait[j,0]
                     self.fsteps[j,0] = np.around((self.gait[j,0]*self.Xs[20,k_cum] / self.dt)  ,decimals = 0)
                     self.gait_new[j,0] =  np.around((self.gait[j,0]*self.Xs[20,k_cum] / self.dt)  ,decimals = 0)
                 else : 

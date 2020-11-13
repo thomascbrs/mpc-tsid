@@ -39,6 +39,8 @@ class MPC_crocoddyl:
         else:
             self.mu = mu
 
+        self.h_ref = 0.2027682
+
         # Integration model : 
         # Implicit : V+ = V + B*U ; P+ = P + dt*V+ = P+ + dt*V + dt*B*U
         # Explicit : V+ = V + B*U ; P+ = P + dt*V
@@ -84,8 +86,9 @@ class MPC_crocoddyl:
         self.index = 0
 
         # Weight on the shoulder term : 
+        # self.shoulderWeights = 2.
         self.shoulderWeights = 2.
-        self.shoulder_hlim = 0.225
+        self.shoulder_hlim = 0.22
 
         # Position of the feet
         self.fsteps = np.full((20, 13), np.nan)
